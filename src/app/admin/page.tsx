@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { Home, Users, Mail, Ban, RefreshCw, Plus, Unlock, LogOut, Map, UserCog, ClockAlert, ChevronRight, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import DesignacaoMap from './DesignacaoMap';
+import GerenciarUsuarios from './GerenciarUsuarios';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -426,11 +427,7 @@ export default function AdminPage() {
 
         {/* TELA DE USUÁRIOS */}
         {activeTab === 'usuarios' && (
-          <div className="bg-white rounded-3xl p-10 py-20 text-center shadow-sm border border-gray-100">
-             <UserCog size={64} className="mx-auto mb-6 text-indigo-100" />
-             <h2 className="text-2xl font-bold text-slate-800 mb-2">Em Breve</h2>
-             <p className="text-gray-500">O módulo de criação de usuários e níveis de acesso estará disponível nas próximas atualizações do sistema.</p>
-          </div>
+          <GerenciarUsuarios />
         )}
 
         {/* TELA DE DESIGNAÇÃO VIA MAP */}

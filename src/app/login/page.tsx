@@ -4,16 +4,31 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Lock } from "lucide-react";
+import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
   const router = useRouter();
   const [usuario, setUsuario] = useState("");
-  const [senha, setSenha] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (usuario.toLowerCase() === "admin" && senha === "admin123") {
+    if (!usuario || !senha) return;
+
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('usuarios')
+      .select('*')
+      .eq('login', usuario.toLowerCase().trim())
+      .limit(1)
+      .single();
+
+    setLoading(false);
+
+    if (data && data.senha === senha) {
       localStorage.setItem("isAdmin", "true");
+      // Opcional: pode guardar o nome do usuário 
+      localStorage.setItem("userName", data.nome);
       router.push("/admin");
     } else {
       alert("Usuário ou senha incorretos!");
@@ -47,9 +62,10 @@ export default function LoginPage() {
           
           <button 
             type="submit" 
-            className="w-full bg-[#0A4D3C] hover:bg-[#083d2f] text-white font-bold rounded-xl px-4 py-3 transition-colors md:mt-2 shadow-sm"
+            disabled={loading}
+            className="w-full bg-[#0A4D3C] hover:bg-[#083d2f] text-white font-bold rounded-xl px-4 py-3 transition-colors md:mt-2 shadow-sm disabled:opacity-50"
           >
-            Entrar
+            {loading ? 'Acessando...' : 'Entrar'}
           </button>
         </form>
 
