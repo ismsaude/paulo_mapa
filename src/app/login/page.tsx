@@ -28,8 +28,8 @@ export default function LoginPage() {
 
     if (data && data.senha === senha) {
       localStorage.setItem("isAdmin", "true");
-      // Opcional: pode guardar o nome do usuário 
       localStorage.setItem("userName", data.nome);
+      localStorage.setItem("userRole", data.tipo);
       router.push("/admin");
     } else {
       alert("Usuário ou senha incorretos!");

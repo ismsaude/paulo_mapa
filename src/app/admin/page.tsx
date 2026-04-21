@@ -21,16 +21,19 @@ export default function AdminPage() {
   const [enderecosBloqueados, setEnderecosBloqueados] = useState<any[]>([]);
   const [oldestQuadras, setOldestQuadras] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'alertas' | 'bloqueadas' | 'usuarios' | 'designacao'>('dashboard');
+  const [userRole, setUserRole] = useState('assistente');
   const fetchBeganRef = useRef(false);
 
   useEffect(() => {
     if (fetchBeganRef.current) return;
 
     const isAdmin = localStorage.getItem('isAdmin');
+    const role = localStorage.getItem('userRole') || 'assistente';
     if (!isAdmin) {
       router.push('/login');
       return;
     }
+    setUserRole(role);
     
     fetchBeganRef.current = true;
     fetchData();
@@ -290,14 +293,16 @@ export default function AdminPage() {
             {/* MENU DE OPÇÕES TIPO APP */}
             <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest pl-2 mb-4 mt-8">Configurações Adicionais</h2>
             <div className="flex flex-col gap-3 mb-10">
-              <Link href="/admin/cadastro" className="bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-4 hover:border-emerald-200 hover:bg-slate-50 transition-all font-bold text-slate-700 active:scale-[0.98]">
-                <div className="bg-emerald-50 text-emerald-500 p-3 rounded-xl"><Map size={24} /></div>
-                <div className="flex-1">
-                  <span className="block text-[17px] leading-tight">Gerenciar Territórios</span>
-                  <span className="text-xs text-gray-400 font-normal">Criar quadras e endereços</span>
-                </div>
-                <ChevronRight className="text-gray-300" />
-              </Link>
+              {userRole === 'admin' && (
+                <Link href="/admin/cadastro" className="bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-4 hover:border-emerald-200 hover:bg-slate-50 transition-all font-bold text-slate-700 active:scale-[0.98]">
+                  <div className="bg-emerald-50 text-emerald-500 p-3 rounded-xl"><Map size={24} /></div>
+                  <div className="flex-1">
+                    <span className="block text-[17px] leading-tight">Gerenciar Territórios</span>
+                    <span className="text-xs text-gray-400 font-normal">Criar quadras e endereços</span>
+                  </div>
+                  <ChevronRight className="text-gray-300" />
+                </Link>
+              )}
 
               <button onClick={() => setActiveTab('designacao')} className="text-left bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-4 hover:border-purple-200 hover:bg-slate-50 transition-all font-bold text-slate-700 active:scale-[0.98]">
                 <div className="bg-purple-50 text-purple-500 p-3 rounded-xl"><Map size={24} /></div>
@@ -308,14 +313,16 @@ export default function AdminPage() {
                 <ChevronRight className="text-gray-300" />
               </button>
 
-              <button onClick={() => setActiveTab('usuarios')} className="text-left bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-4 hover:border-indigo-200 hover:bg-slate-50 transition-all font-bold text-slate-700 active:scale-[0.98]">
-                <div className="bg-indigo-50 text-indigo-500 p-3 rounded-xl"><UserCog size={24} /></div>
-                <div className="flex-1">
-                  <span className="block text-[17px] leading-tight">Gerenciar Usuários</span>
-                  <span className="text-xs text-gray-400 font-normal">Cadastrar líderes e senhas</span>
-                </div>
-                <ChevronRight className="text-gray-300" />
-              </button>
+              {userRole === 'admin' && (
+                <button onClick={() => setActiveTab('usuarios')} className="text-left bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-4 hover:border-indigo-200 hover:bg-slate-50 transition-all font-bold text-slate-700 active:scale-[0.98]">
+                  <div className="bg-indigo-50 text-indigo-500 p-3 rounded-xl"><UserCog size={24} /></div>
+                  <div className="flex-1">
+                    <span className="block text-[17px] leading-tight">Gerenciar Usuários</span>
+                    <span className="text-xs text-gray-400 font-normal">Cadastrar líderes e senhas</span>
+                  </div>
+                  <ChevronRight className="text-gray-300" />
+                </button>
+              )}
 
               <button onClick={() => setActiveTab('alertas')} className="text-left bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 hover:bg-slate-50 transition-all font-bold text-slate-700 active:scale-[0.98]">
                 <div className="bg-orange-50 text-orange-500 p-3 rounded-xl"><ClockAlert size={24} /></div>
@@ -337,18 +344,20 @@ export default function AdminPage() {
             </div>
 
             {/* ZONA DE PERIGO */}
-            <div className="mt-12 border-t border-red-200/50 pt-10 flex flex-col items-center justify-center pb-8 opacity-80 hover:opacity-100 transition-opacity">
-                <p className="text-red-400/80 text-[10px] font-bold uppercase tracking-widest mb-3">ATENÇÃO</p>
-                <button 
-                  onClick={handleReset} 
-                  className="bg-white border text-red-500 border-red-100 hover:bg-red-50 hover:border-red-200 px-6 py-3 rounded-2xl shadow-sm text-sm font-bold transition-all active:scale-95 flex items-center gap-2"
-                >
-                  <RefreshCw size={16} /> RESETAR TERRITÓRIO
-                </button>
-                <p className="max-w-xs text-center text-[11px] text-gray-400 mt-3 leading-relaxed">
-                  Isso apagará o histórico da campanha atual de *todas* as quadras simultaneamente, voltando-as para 0%. Casas "Não Visitar" serão preservadas.
-                </p>
-            </div>
+            {userRole === 'admin' && (
+              <div className="mt-12 border-t border-red-200/50 pt-10 flex flex-col items-center justify-center pb-8 opacity-80 hover:opacity-100 transition-opacity">
+                  <p className="text-red-400/80 text-[10px] font-bold uppercase tracking-widest mb-3">ATENÇÃO</p>
+                  <button 
+                    onClick={handleReset} 
+                    className="bg-white border text-red-500 border-red-100 hover:bg-red-50 hover:border-red-200 px-6 py-3 rounded-2xl shadow-sm text-sm font-bold transition-all active:scale-95 flex items-center gap-2"
+                  >
+                    <RefreshCw size={16} /> RESETAR TERRITÓRIO
+                  </button>
+                  <p className="max-w-xs text-center text-[11px] text-gray-400 mt-3 leading-relaxed">
+                    Isso apagará o histórico da campanha atual de *todas* as quadras simultaneamente, voltando-as para 0%. Casas "Não Visitar" serão preservadas.
+                  </p>
+              </div>
+            )}
           </>
         )}
 

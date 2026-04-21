@@ -104,7 +104,12 @@ export default function GerenciarUsuarios() {
                   {u.nome.substring(0, 2).toUpperCase()}
                </div>
                <div>
-                  <p className="font-bold text-slate-800 text-[15px]">{u.nome}</p>
+                  <p className="font-bold text-slate-800 text-[15px] flex items-center gap-2">
+                    {u.nome}
+                    <span className={`text-[9px] uppercase px-2 tracking-wider py-0.5 rounded-full font-bold ${u.tipo === 'admin' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+                      {u.tipo === 'admin' ? 'Admin' : 'Assistente'}
+                    </span>
+                  </p>
                   <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5"><Shield size={12} className="text-indigo-400"/> {u.login} &bull; <Key size={12} className="text-orange-400 ml-1"/> {u.senha}</p>
                </div>
              </div>
@@ -139,6 +144,13 @@ export default function GerenciarUsuarios() {
                <div>
                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Senha Restrita</label>
                  <input type="text" required value={formData.senha} onChange={e => setFormData({...formData, senha: e.target.value})} className="w-full border border-gray-200 rounded-xl p-3 outline-none focus:border-indigo-400 bg-gray-50" placeholder="Defina a senha" />
+               </div>
+               <div>
+                 <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Nível de Acesso</label>
+                 <select value={formData.tipo} onChange={e => setFormData({...formData, tipo: e.target.value})} className="w-full border border-gray-200 rounded-xl p-3 outline-none focus:border-indigo-400 bg-gray-50 font-medium text-slate-700">
+                   <option value="admin">Administrador Total</option>
+                   <option value="assistente">Assistente (Sem perigos)</option>
+                 </select>
                </div>
                <div className="mt-4 flex gap-3">
                  <button type="button" onClick={() => setShowModal(false)} className="flex-1 border border-gray-200 py-3 rounded-xl font-bold text-slate-600 hover:bg-gray-50">Cancelar</button>
