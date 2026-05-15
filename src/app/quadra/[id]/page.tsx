@@ -15,7 +15,6 @@ export default function QuadraPage() {
 
   // Estados do Modal
   const [modalAberto, setModalAberto] = useState(false);
-  const [modalMapa, setModalMapa] = useState(false);
   const [enderecoSelecionado, setEnderecoSelecionado] = useState<any>(null);
 
   useEffect(() => {
@@ -164,13 +163,6 @@ export default function QuadraPage() {
           </h1>
           
           <div className="relative mt-2 flex items-center justify-center">
-            <button 
-              onClick={() => setModalMapa(true)}
-              className="absolute left-0 text-2xl drop-shadow-sm hover:scale-110 active:scale-95 transition-transform"
-              aria-label="Ver Mapa"
-            >
-              🗺️
-            </button>
             <p className="text-gray-500 text-[13px] sm:text-sm">
                {quadra?.territorio_nome} - {quadra?.territorio_bairro || 'Santa Rita'}
             </p>
@@ -340,33 +332,6 @@ export default function QuadraPage() {
                     Não<br/>visitar
                   </span>
                 </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* MODAL DO MAPA */}
-        {modalMapa && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-              <div className="flex justify-between items-center p-5 border-b border-gray-100">
-                <h3 className="font-bold text-lg text-slate-800">Mapa Geral</h3>
-                <button 
-                  onClick={() => setModalMapa(false)} 
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200"
-                >
-                   <X size={18} />
-                </button>
-              </div>
-              <div className="p-4 flex-1 overflow-auto bg-gray-50 flex items-center justify-center">
-                <img 
-                  src="/mapa-geral.jpg" 
-                  alt="Mapa Geral" 
-                  className="max-w-full rounded-xl shadow-sm border border-gray-200"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://placehold.co/600x400/eeeeee/888888?text=Imagem+nao+encontrada.%5CnAdicione+%22mapa-geral.jpg%22+na+pasta+public';
-                  }}
-                />
               </div>
             </div>
           </div>
