@@ -121,14 +121,9 @@ export default function CadastroPage() {
       return;
     }
     setLoadingMsg('Buscando endereços...');
-    const { data } = await supabase.from('enderecos').select('*').eq('quadra_id', quadraId);
+    const { data } = await supabase.from('enderecos').select('*').eq('quadra_id', quadraId).order('created_at', { ascending: true });
     if (data) {
-       const sorted = data.sort((a, b) => {
-         const numA = parseInt(a.numero) || 0;
-         const numB = parseInt(b.numero) || 0;
-         return numA - numB;
-       });
-       setQuadraEnderecos(sorted);
+       setQuadraEnderecos(data);
     }
     setLoadingMsg('');
   }

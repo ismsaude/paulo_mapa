@@ -48,11 +48,12 @@ export default function QuadraPage() {
         // Agrupa os endereços por nome da rua
         const agrupados: Record<string, any[]> = {};
         
-        // Vamos garantir que ordenamos pelo número adequadamente (numero é string, mas tentamos conversão)
+        // Mantém a ordem em que foram cadastrados (que geralmente reflete a ordem da rua)
         const sortedEnderecos = (data.enderecos || []).sort((a: any, b: any) => {
-          const numA = parseInt(a.numero) || 0;
-          const numB = parseInt(b.numero) || 0;
-          return numA - numB;
+          if (a.created_at && b.created_at) {
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          }
+          return a.id < b.id ? -1 : 1;
         });
 
         sortedEnderecos.forEach((e: any) => {
