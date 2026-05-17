@@ -48,7 +48,7 @@ export default function MapModal({ onClose }: { onClose: () => void }) {
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img 
-            src="/mapa-geral.jpg" 
+            src="/mapa-geral.jpg?v=2" 
             alt="Mapa Geral" 
             className="max-w-full h-auto rounded-xl shadow-2xl"
           />

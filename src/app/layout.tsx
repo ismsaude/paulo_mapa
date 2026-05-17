@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Mapa Santa Rita",
   description: "Controle de territórios",
+  icons: {
+    icon: "/logo.png",
+  },
 };
 
 export default function RootLayout({
