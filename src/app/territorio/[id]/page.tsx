@@ -1,15 +1,17 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, ArrowRight, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, X, Map as MapIcon } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
+import MapModal from '@/components/MapModal';
 
 export default function TerritorioPage() {
   const params = useParams();
   const [territorio, setTerritorio] = useState<any>(null);
   const [quadras, setQuadras] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isMapOpen, setIsMapOpen] = useState(false);
 
   useEffect(() => {
     async function fetchQuadras() {
@@ -88,6 +90,14 @@ export default function TerritorioPage() {
         
         {/* CABEÇALHO */}
         <header className="text-center pb-8 pt-2 px-1 relative">
+          <button 
+            onClick={() => setIsMapOpen(true)}
+            className="absolute left-0 top-0 text-[#0A4D3C] hover:text-[#083d2f] bg-[#0A4D3C]/10 hover:bg-[#0A4D3C]/20 p-2 rounded-full transition-all"
+            title="Ver Mapa Geral"
+          >
+            <MapIcon size={20} />
+          </button>
+
           <h1 className="text-[22px] sm:text-3xl font-bold text-slate-800 tracking-tight uppercase">
             {territorio?.nome} - {territorio?.bairro || 'Santa Rita'}
           </h1>
@@ -145,6 +155,8 @@ export default function TerritorioPage() {
           )}
         </div>
       </div>
+
+      {isMapOpen && <MapModal onClose={() => setIsMapOpen(false)} />}
     </main>
   );
 }

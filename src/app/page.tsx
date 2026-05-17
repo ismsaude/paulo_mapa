@@ -1,12 +1,14 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { ArrowRight, X, Settings } from 'lucide-react';
+import { ArrowRight, X, Settings, Map as MapIcon } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
+import MapModal from '@/components/MapModal';
 
 export default function Home() {
   const [territorios, setTerritorios] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isMapOpen, setIsMapOpen] = useState(false);
 
   // ... (use effect stays the same)
   useEffect(() => {
@@ -93,6 +95,14 @@ export default function Home() {
         <Settings size={20} />
       </Link>
       
+      <button 
+        onClick={() => setIsMapOpen(true)}
+        className="absolute top-6 left-6 text-[#0A4D3C] hover:text-[#083d2f] bg-[#0A4D3C]/10 hover:bg-[#0A4D3C]/20 p-2 rounded-full transition-all z-10"
+        title="Ver Mapa Geral"
+      >
+        <MapIcon size={20} />
+      </button>
+      
       <header className="text-center py-8 px-4 max-w-4xl mx-auto relative">
         <h1 className="text-[22px] sm:text-3xl font-bold text-slate-800 tracking-tight">Territórios Jardim Santa Rita</h1>
         
@@ -136,6 +146,8 @@ export default function Home() {
           </Link>
         ))}
       </div>
+
+      {isMapOpen && <MapModal onClose={() => setIsMapOpen(false)} />}
     </main>
   );
 }

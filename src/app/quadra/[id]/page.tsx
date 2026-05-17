@@ -1,9 +1,10 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Check, Edit2, X, UserCheck, Mail, Ban } from 'lucide-react';
+import { Check, Edit2, X, UserCheck, Mail, Ban, Map as MapIcon } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
+import MapModal from '@/components/MapModal';
 
 export default function QuadraPage() {
   const params = useParams();
@@ -12,6 +13,7 @@ export default function QuadraPage() {
   const [quadra, setQuadra] = useState<any>(null);
   const [enderecosAgrupados, setEnderecosAgrupados] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(true);
+  const [isMapOpen, setIsMapOpen] = useState(false);
 
   // Estados do Modal
   const [modalAberto, setModalAberto] = useState(false);
@@ -159,6 +161,14 @@ export default function QuadraPage() {
         
         {/* CABEÇALHO PADRONIZADO */}
         <header className="text-center pb-6 pt-2 px-1 relative">
+          <button 
+            onClick={() => setIsMapOpen(true)}
+            className="absolute left-0 top-0 text-[#0A4D3C] hover:text-[#083d2f] bg-[#0A4D3C]/10 hover:bg-[#0A4D3C]/20 p-2 rounded-full transition-all"
+            title="Ver Mapa Geral"
+          >
+            <MapIcon size={20} />
+          </button>
+
           <h1 className="text-[22px] sm:text-3xl font-bold text-slate-800 tracking-tight uppercase">
             {quadra?.nome}
           </h1>
@@ -338,6 +348,8 @@ export default function QuadraPage() {
           </div>
         )}
       </div>
+
+      {isMapOpen && <MapModal onClose={() => setIsMapOpen(false)} />}
     </main>
   );
 }
