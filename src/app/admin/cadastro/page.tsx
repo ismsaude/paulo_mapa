@@ -121,7 +121,7 @@ export default function CadastroPage() {
       return;
     }
     setLoadingMsg('Buscando endereços...');
-    const { data } = await supabase.from('enderecos').select('*').eq('quadra_id', quadraId).order('created_at', { ascending: true });
+    const { data } = await supabase.from('enderecos').select('*').eq('quadra_id', quadraId);
     if (data) {
        setQuadraEnderecos(data);
     }

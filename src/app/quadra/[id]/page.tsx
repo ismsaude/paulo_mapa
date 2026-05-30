@@ -50,13 +50,8 @@ export default function QuadraPage() {
         // Agrupa os endereços por nome da rua
         const agrupados: Record<string, any[]> = {};
         
-        // Mantém a ordem em que foram cadastrados (que geralmente reflete a ordem da rua)
-        const sortedEnderecos = (data.enderecos || []).sort((a: any, b: any) => {
-          if (a.created_at && b.created_at) {
-            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-          }
-          return a.id < b.id ? -1 : 1;
-        });
+        // Retorna na ordem natural do banco de dados (que reflete a ordem da planilha CSV importada)
+        const sortedEnderecos = (data.enderecos || []);
 
         sortedEnderecos.forEach((e: any) => {
           const rua = e.rua || 'Sem Rua';
