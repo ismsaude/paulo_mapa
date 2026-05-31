@@ -3,7 +3,7 @@ import { Download, Save, History, X, Trash2 } from 'lucide-react';
 
 const INITIAL_PIN_NAMES = [
   "G-Fábio", "G-Pedro", "G-Valdenor", "G-Átila", "G-Bruno", "G-Denis", "G-Leonardo", 
-  "Segunda", "Terça", "Quarta", "Quinta", "Sexta"
+  "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Sábado"
 ];
 
 // Cor gerada baseada no index para garantir tons únicos e vibrantes
@@ -28,6 +28,9 @@ export default function DesignacaoMap() {
   // States for Date Stamp
   const [stampText, setStampText] = useState("");
   const [stamp, setStamp] = useState({ isPlaced: false, x: 0, y: 0 });
+
+  // Annotations for placed pins
+  const [pinNotes, setPinNotes] = useState<Record<string, string>>({});
 
   // States for report history
   const [history, setHistory] = useState<any[]>([]);
@@ -87,6 +90,7 @@ export default function DesignacaoMap() {
     if (!window.confirm("Remover todas as bandeiras do mapa e voltar peças para a caixa?")) return;
     setPins(prev => prev.map(p => ({ ...p, isPlaced: false })));
     setStamp(prev => ({ ...prev, isPlaced: false }));
+    setPinNotes({});
   };
 
   const downloadImage = () => {
@@ -224,7 +228,10 @@ export default function DesignacaoMap() {
     const novoRegistro = {
       id: Date.now().toString(),
       data: new Date().toLocaleString('pt-BR'),
-      designacoes: placedPins.map(p => p.name)
+      designacoes: placedPins.map(p => {
+        const note = pinNotes[p.id];
+        return note ? `${p.name} → ${note}` : p.name;
+      })
     };
 
     const newHistory = [novoRegistro, ...history];
@@ -343,8 +350,39 @@ export default function DesignacaoMap() {
         )}
       </div>
 
+      {/* PLANILHA AUXILIAR DE REGISTROS */}
+      {pins.filter(p => p.isPlaced).length > 0 && (
+        <div className="w-full mt-6 bg-white border border-gray-200 p-4 sm:p-5 rounded-3xl shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest mb-2 flex items-center gap-2">
+            <span className="bg-blue-100 text-blue-600 p-1.5 rounded-lg"><Save size={16}/></span> 
+            Planilha de Apoio
+          </h3>
+          <p className="text-[11px] text-gray-500 mb-4 font-medium leading-relaxed">
+            Se desejar, anote o território onde você soltou cada bandeira acima. Isso ajudará você a lembrar mais tarde quando consultar o Histórico.
+          </p>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {pins.filter(p => p.isPlaced).map(p => (
+              <div key={`note-${p.id}`} className="flex items-center gap-2 p-2 rounded-xl border border-gray-200 bg-gray-50 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-400 transition-all shadow-sm hover:shadow-md">
+                <div className="flex items-center gap-2 px-2 min-w-[85px] sm:min-w-[95px]">
+                  <div className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full shadow-sm flex-shrink-0" style={{ backgroundColor: p.color }}></div>
+                  <span className="font-bold text-[11px] sm:text-xs text-slate-700 whitespace-nowrap">{p.name}</span>
+                </div>
+                <input 
+                  type="text" 
+                  placeholder="Ex: T. 05..."
+                  value={pinNotes[p.id] || ""}
+                  onChange={(e) => setPinNotes(prev => ({ ...prev, [p.id]: e.target.value }))}
+                  className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-[11px] sm:text-xs font-bold text-slate-700 outline-none placeholder:font-normal placeholder:text-gray-400"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* CAIXA DE FERRAMENTAS */}
-      <div className="w-full mt-8 bg-gray-50 border border-gray-200 p-4 rounded-3xl">
+      <div className="w-full mt-6 bg-gray-50 border border-gray-200 p-4 rounded-3xl">
         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 pl-1">Bandeiras Disponíveis</h3>
         
         <div className="flex flex-wrap gap-2">

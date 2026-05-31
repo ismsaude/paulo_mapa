@@ -135,7 +135,7 @@ export default function Home() {
 
             <div className="w-full border-t border-gray-100 pt-3 flex flex-col items-center">
               {t.quadrasNomes && (
-                <span className="text-[9px] text-gray-400 mb-2 truncate max-w-full px-2" title={t.quadrasNomes}>
+                <span className="text-[12px] text-gray-500 font-medium mb-2 truncate max-w-full px-2" title={t.quadrasNomes}>
                   Quadras: {t.quadrasNomes}
                 </span>
               )}

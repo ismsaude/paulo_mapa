@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { Home, Users, Mail, Ban, RefreshCw, Plus, Unlock, LogOut, Map, UserCog, ClockAlert, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Home, Users, Mail, Ban, RefreshCw, Plus, Unlock, LogOut, Map, UserCog, ClockAlert, ChevronRight, ArrowLeft, X } from 'lucide-react';
 import Link from 'next/link';
 import DesignacaoMap from './DesignacaoMap';
 import GerenciarUsuarios from './GerenciarUsuarios';
@@ -19,6 +19,8 @@ export default function AdminPage() {
     percentagem: 0
   });
   const [enderecosBloqueados, setEnderecosBloqueados] = useState<any[]>([]);
+  const [todosEnderecos, setTodosEnderecos] = useState<any[]>([]);
+  const [detalhesModal, setDetalhesModal] = useState<'total' | 'falados' | 'cartas' | 'restritas' | null>(null);
   const [oldestQuadras, setOldestQuadras] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'alertas' | 'bloqueadas' | 'usuarios' | 'designacao'>('dashboard');
   const [userRole, setUserRole] = useState('assistente');
@@ -84,6 +86,7 @@ export default function AdminPage() {
     const enderecos = allEnderecos;
 
     if (enderecos) {
+      setTodosEnderecos(enderecos);
       let t = 0, f = 0, c = 0, b = 0;
       const bloqueadosList: any[] = [];
       const quadrasData: Record<string, any> = {};
@@ -211,6 +214,79 @@ export default function AdminPage() {
     );
   }
 
+  // Lógica para o modal de detalhes
+  const obterEnderecosFiltrados = () => {
+    if (!detalhesModal) return [];
+    
+    return todosEnderecos.filter(end => {
+      const s = String(end.status).toLowerCase();
+      const isBloq = s === 'bloqueado' || end.is_bloqueado === true || String(end.is_bloqueado).toLowerCase() === 'true';
+
+      if (detalhesModal === 'restritas') return isBloq;
+      if (detalhesModal === 'falados') return !isBloq && (s === 'falado' || s === 'true');
+      if (detalhesModal === 'cartas') return !isBloq && s === 'cartas';
+      if (detalhesModal === 'total') return true;
+      return false;
+    });
+  };
+
+  const getModalTitle = () => {
+    if (detalhesModal === 'falados') return 'Casas Faladas';
+    if (detalhesModal === 'cartas') return 'Cartas Entregues';
+    if (detalhesModal === 'restritas') return 'Casas Restritas';
+    if (detalhesModal === 'total') return 'Todos os Endereços';
+    return '';
+  };
+  
+  const getModalColor = () => {
+    if (detalhesModal === 'falados') return 'text-green-700 bg-green-100 border-green-200';
+    if (detalhesModal === 'cartas') return 'text-blue-700 bg-blue-100 border-blue-200';
+    if (detalhesModal === 'restritas') return 'text-red-700 bg-red-100 border-red-200';
+    return 'text-slate-800 bg-gray-200 border-gray-300';
+  };
+
+  const renderizarListaModal = () => {
+    const lista = obterEnderecosFiltrados();
+    // Ordena por Território -> Quadra -> Casa (Numérico)
+    const ordenada = [...lista].sort((a, b) => {
+      const tA = a.quadra?.territorio?.nome || '';
+      const tB = b.quadra?.territorio?.nome || '';
+      if (tA !== tB) return tA.localeCompare(tB);
+      
+      const qA = a.quadra?.nome || '';
+      const qB = b.quadra?.nome || '';
+      if (qA !== qB) return qA.localeCompare(qB);
+      
+      const nA = parseInt(a.numero) || 0;
+      const nB = parseInt(b.numero) || 0;
+      return nA - nB;
+    });
+
+    return (
+      <div className="flex flex-col gap-2 p-3 sm:p-5">
+        {ordenada.length === 0 ? (
+           <p className="text-center text-gray-400 py-10 font-medium">Nenhum endereço encontrado.</p>
+        ) : (
+          ordenada.map(end => (
+            <div key={end.id} className="flex justify-between items-center p-3 bg-white border border-gray-100 rounded-xl shadow-sm hover:border-gray-200 transition-colors">
+              <div>
+                <p className="font-bold text-slate-700 text-[15px]">Nº {end.numero} - {end.rua}</p>
+                <p className="text-[10px] text-gray-500 font-bold uppercase mt-0.5 tracking-wider">
+                  {end.quadra?.territorio?.nome} &bull; {end.quadra?.nome}
+                </p>
+              </div>
+              {end.data_visita && (
+                <span className="text-[10px] text-gray-500 font-bold bg-gray-100 px-2.5 py-1 rounded-lg">
+                  {new Date(end.data_visita).toLocaleDateString('pt-BR')}
+                </span>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    );
+  };
+
   return (
     <main className="min-h-screen bg-gray-50 p-4 sm:p-8">
       <div className="max-w-4xl mx-auto">
@@ -260,34 +336,34 @@ export default function AdminPage() {
             </div>
 
             {/* DASHBOARD CARDS */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-              <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex flex-col justify-between h-32">
-                <div className="flex items-center gap-2 text-slate-400">
-                  <Home size={18} /> <span className="font-bold text-xs uppercase tracking-wide">Total Geral</span>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10 items-stretch">
+              <button onClick={() => setDetalhesModal('total')} className="text-left bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-gray-100 flex flex-col justify-between h-full min-h-[130px] hover:scale-[1.03] hover:shadow-md hover:border-gray-300 transition-all active:scale-95 cursor-pointer">
+                <div className="flex items-start gap-2 text-slate-400">
+                  <Home size={18} className="mt-0.5 flex-shrink-0" /> <span className="font-bold text-[10px] sm:text-[11px] uppercase tracking-wide leading-tight">Total de casas no nosso território</span>
                 </div>
-                <span className="text-4xl font-black text-slate-800 leading-none">{stats.total}</span>
-              </div>
+                <span className="text-4xl font-black text-slate-800 leading-none mt-4">{stats.total}</span>
+              </button>
 
-              <div className="bg-green-50 p-5 rounded-3xl shadow-sm border border-green-100 flex flex-col justify-between h-32">
-                <div className="flex items-center gap-2 text-green-500">
-                  <Users size={18} /> <span className="font-bold text-xs uppercase tracking-wide">Falados</span>
+              <button onClick={() => setDetalhesModal('falados')} className="text-left bg-green-50 p-4 sm:p-5 rounded-3xl shadow-sm border border-green-100 flex flex-col justify-between h-full min-h-[130px] hover:scale-[1.03] hover:shadow-md hover:border-green-300 transition-all active:scale-95 cursor-pointer">
+                <div className="flex items-start gap-2 text-green-500">
+                  <Users size={18} className="mt-0.5 flex-shrink-0" /> <span className="font-bold text-[10px] sm:text-[11px] uppercase tracking-wide leading-tight">Total de casas onde foi falado</span>
                 </div>
-                <span className="text-4xl font-black text-green-700 leading-none">{stats.falados}</span>
-              </div>
+                <span className="text-4xl font-black text-green-700 leading-none mt-4">{stats.falados}</span>
+              </button>
 
-              <div className="bg-blue-50 p-5 rounded-3xl shadow-sm border border-blue-100 flex flex-col justify-between h-32">
-                <div className="flex items-center gap-2 text-blue-500">
-                  <Mail size={18} /> <span className="font-bold text-xs uppercase tracking-wide">Cartas</span>
+              <button onClick={() => setDetalhesModal('cartas')} className="text-left bg-blue-50 p-4 sm:p-5 rounded-3xl shadow-sm border border-blue-100 flex flex-col justify-between h-full min-h-[130px] hover:scale-[1.03] hover:shadow-md hover:border-blue-300 transition-all active:scale-95 cursor-pointer">
+                <div className="flex items-start gap-2 text-blue-500">
+                  <Mail size={18} className="mt-0.5 flex-shrink-0" /> <span className="font-bold text-[10px] sm:text-[11px] uppercase tracking-wide leading-tight">Total de casas onde foram deixado cartas/convites</span>
                 </div>
-                <span className="text-4xl font-black text-blue-700 leading-none">{stats.cartas}</span>
-              </div>
+                <span className="text-4xl font-black text-blue-700 leading-none mt-4">{stats.cartas}</span>
+              </button>
 
-              <div className="bg-red-50 p-5 rounded-3xl shadow-sm border border-red-100 flex flex-col justify-between h-32">
-                <div className="flex items-center gap-2 text-red-500">
-                  <Ban size={18} /> <span className="font-bold text-xs uppercase tracking-wide">Restritas</span>
+              <button onClick={() => setDetalhesModal('restritas')} className="text-left bg-red-50 p-4 sm:p-5 rounded-3xl shadow-sm border border-red-100 flex flex-col justify-between h-full min-h-[130px] hover:scale-[1.03] hover:shadow-md hover:border-red-300 transition-all active:scale-95 cursor-pointer">
+                <div className="flex items-start gap-2 text-red-500">
+                  <Ban size={18} className="mt-0.5 flex-shrink-0" /> <span className="font-bold text-[10px] sm:text-[11px] uppercase tracking-wide leading-tight">Total de casas para não visitar</span>
                 </div>
-                <span className="text-4xl font-black text-red-700 leading-none">{stats.bloqueados}</span>
-              </div>
+                <span className="text-4xl font-black text-red-700 leading-none mt-4">{stats.bloqueados}</span>
+              </button>
             </div>
 
             {/* MENU DE OPÇÕES TIPO APP */}
@@ -442,6 +518,30 @@ export default function AdminPage() {
         {/* TELA DE DESIGNAÇÃO VIA MAP */}
         {activeTab === 'designacao' && (
           <DesignacaoMap />
+        )}
+
+        {/* MODAL DE DETALHES DOS CARDS */}
+        {detalhesModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6">
+            <div className="bg-gray-50 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+              <div className={`flex justify-between items-center p-5 border-b ${getModalColor()}`}>
+                <div>
+                  <h3 className="font-bold text-lg uppercase tracking-wider">{getModalTitle()}</h3>
+                  <p className="text-sm opacity-80 font-medium">{obterEnderecosFiltrados().length} endereços encontrados</p>
+                </div>
+                <button 
+                  onClick={() => setDetalhesModal(null)}
+                  className="w-9 h-9 flex items-center justify-center rounded-full bg-black/5 hover:bg-black/10 text-current transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="flex-1 overflow-auto bg-gray-50/50">
+                 {renderizarListaModal()}
+              </div>
+            </div>
+          </div>
         )}
 
       </div>
