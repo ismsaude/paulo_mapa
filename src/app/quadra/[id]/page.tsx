@@ -238,39 +238,39 @@ export default function QuadraPage() {
                        <div className="flex items-center gap-2.5 w-full">
                          
                          {/* Lado Esquerdo: Ícone + Checkbox */}
-                         <div className="flex items-center gap-1.5 flex-shrink-0 w-11 justify-end">
+                         <div className="flex items-center gap-2 flex-shrink-0 w-14 justify-end">
                             {!taVazio && !isBloqueado && (String(end.status).toLowerCase() === 'cartas' ? (
-                              <span className="text-[12px] leading-none">✉️</span>
+                              <span className="text-[14px] leading-none">✉️</span>
                             ) : (
-                              <span className="text-[12px] leading-none">🗣️</span>
+                              <span className="text-[14px] leading-none">🗣️</span>
                             ))}
                             {isBloqueado && (
-                              <span className="text-[10px] leading-none">❌</span>
+                              <span className="text-[12px] leading-none">❌</span>
                             )}
                             
                             {/* Checkbox em si */}
-                            <div className={`w-6 h-6 rounded flex items-center justify-center border-2 font-bold flex-shrink-0
-                              ${!taVazio && !isBloqueado ? 'bg-slate-200 border-slate-400' : 'bg-white border-gray-400'}
-                              ${isBloqueado ? 'bg-gray-100 border-gray-300' : ''}
+                            <div className={`w-8 h-8 rounded flex items-center justify-center border-[3px] font-bold flex-shrink-0
+                              ${!taVazio && !isBloqueado ? 'bg-gray-200 border-black' : 'bg-white border-black'}
+                              ${isBloqueado ? 'bg-gray-100 border-gray-400' : ''}
                             `}>
                               {!taVazio && !isBloqueado && (
-                                <Check size={16} strokeWidth={3} className="text-slate-700" />
+                                <Check size={20} strokeWidth={4} className="text-black" />
                               )}
                             </div>
                          </div>
 
                          {/* Lado Direito: Número e Data */}
-                         <div className="flex items-center gap-1.5 flex-wrap">
-                           <span className={`text-base font-bold leading-none ${isBloqueado ? 'line-through text-gray-500' : 'text-slate-800'}`}>
+                         <div className="flex items-center gap-2 flex-wrap">
+                           <span className={`text-xl font-bold leading-none ${isBloqueado ? 'line-through text-gray-500' : 'text-slate-800'}`}>
                              {end.numero}
                            </span>
                            {!taVazio && !isBloqueado && end.data_visita && (
-                             <span className="text-[10px] text-gray-400 font-medium leading-none">
+                             <span className="text-xs text-gray-500 font-medium leading-none">
                                ({formatData(end.data_visita)})
                              </span>
                            )}
                            {isBloqueado && (
-                             <span className="text-[10px] text-gray-400 leading-none">Não Visitar</span>
+                             <span className="text-xs text-gray-400 leading-none">Não Visitar</span>
                            )}
                          </div>
                        </div>
