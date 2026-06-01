@@ -303,7 +303,7 @@ export default function DesignacaoMap() {
       >
         <img 
           ref={mapImgRef}
-          src="/mapa-geral.jpg" 
+          src="/mapa-geral.jpg?v=2" 
           alt="Mapa Base" 
           className="w-full h-auto block" 
         />
