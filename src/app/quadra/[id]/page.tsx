@@ -200,7 +200,7 @@ export default function QuadraPage() {
             <div key={rua} className="mb-6 rounded-xl border border-gray-100 overflow-hidden shadow-sm">
               
               {/* TÍTULO DA RUA */}
-              <div className="bg-gray-50 px-4 py-3 font-semibold text-slate-800 text-sm border-b border-gray-100">
+              <div className="bg-gray-50 px-4 py-3 font-semibold text-slate-800 text-lg border-b border-gray-100">
                 {rua}
               </div>
               
