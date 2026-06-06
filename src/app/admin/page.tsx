@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { Home, Users, Mail, Ban, RefreshCw, Plus, Unlock, LogOut, Map, UserCog, ClockAlert, ChevronRight, ArrowLeft, X } from 'lucide-react';
+import { Home, Users, Mail, Ban, RefreshCw, Plus, Unlock, LogOut, Map, UserCog, ClockAlert, ChevronRight, ArrowLeft, X, BarChart2, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import DesignacaoMap from './DesignacaoMap';
 import GerenciarUsuarios from './GerenciarUsuarios';
@@ -22,7 +22,9 @@ export default function AdminPage() {
   const [todosEnderecos, setTodosEnderecos] = useState<any[]>([]);
   const [detalhesModal, setDetalhesModal] = useState<'total' | 'falados' | 'cartas' | 'restritas' | null>(null);
   const [oldestQuadras, setOldestQuadras] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'alertas' | 'bloqueadas' | 'usuarios' | 'designacao'>('dashboard');
+  const [progressoData, setProgressoData] = useState<any[]>([]);
+  const [expandedTerritorio, setExpandedTerritorio] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'alertas' | 'bloqueadas' | 'usuarios' | 'designacao' | 'progresso'>('dashboard');
   const [userRole, setUserRole] = useState('assistente');
   const fetchBeganRef = useRef(false);
 
@@ -124,6 +126,46 @@ export default function AdminPage() {
           }
         }
       });
+      
+      // Agrupamento para "Visão Geral de Progresso"
+      const progressoMap: Record<string, any> = {};
+      enderecos.forEach(end => {
+        if (end.quadra && end.quadra.territorio) {
+          const tName = end.quadra.territorio.nome;
+          const qName = end.quadra.nome;
+          const s = String(end.status).toLowerCase();
+          const isBloq = s === 'bloqueado' || end.is_bloqueado === true || String(end.is_bloqueado).toLowerCase() === 'true';
+          const estaCompleta = s === 'falado' || s === 'true' || s === 'cartas' || isBloq;
+          
+          if (!progressoMap[tName]) {
+            progressoMap[tName] = { nome: tName, total: 0, completos: 0, quadras: {} };
+          }
+          if (!progressoMap[tName].quadras[qName]) {
+            progressoMap[tName].quadras[qName] = { nome: qName, total: 0, completos: 0 };
+          }
+          
+          progressoMap[tName].total++;
+          progressoMap[tName].quadras[qName].total++;
+          
+          if (estaCompleta) {
+             progressoMap[tName].completos++;
+             progressoMap[tName].quadras[qName].completos++;
+          }
+        }
+      });
+      
+      const progressoArray = Object.values(progressoMap).map((t: any) => ({
+        ...t,
+        quadras: Object.values(t.quadras).sort((a: any, b: any) => {
+          const matchA = a.nome.match(/\d+/);
+          const matchB = b.nome.match(/\d+/);
+          const numA = matchA ? parseInt(matchA[0], 10) : 0;
+          const numB = matchB ? parseInt(matchB[0], 10) : 0;
+          return numA - numB;
+        })
+      })).sort((a: any, b: any) => a.nome.localeCompare(b.nome));
+      
+      setProgressoData(progressoArray);
 
       const activeTotal = t - b;
       const worked = f + c;
@@ -301,7 +343,8 @@ export default function AdminPage() {
                {activeTab === 'dashboard' ? 'Painel Geral' :
                 activeTab === 'alertas' ? 'Inatividade' :
                 activeTab === 'bloqueadas' ? 'Não Visitar' : 
-                activeTab === 'designacao' ? 'Designações' : 'Gerenciar Usuários'}
+                activeTab === 'designacao' ? 'Designações' : 
+                activeTab === 'progresso' ? 'Visão Geral' : 'Gerenciar Usuários'}
              </h1>
           </div>
           
@@ -379,6 +422,15 @@ export default function AdminPage() {
                   <ChevronRight className="text-gray-300" />
                 </Link>
               )}
+
+              <button onClick={() => setActiveTab('progresso')} className="text-left bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-4 hover:border-blue-200 hover:bg-slate-50 transition-all font-bold text-slate-700 active:scale-[0.98]">
+                <div className="bg-blue-50 text-blue-500 p-3 rounded-xl"><BarChart2 size={24} /></div>
+                <div className="flex-1">
+                  <span className="block text-[17px] leading-tight">Visão Geral de Progresso</span>
+                  <span className="text-xs text-gray-400 font-normal">Casas faltantes por local</span>
+                </div>
+                <ChevronRight className="text-gray-300" />
+              </button>
 
               <button onClick={() => setActiveTab('designacao')} className="text-left bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-4 hover:border-purple-200 hover:bg-slate-50 transition-all font-bold text-slate-700 active:scale-[0.98]">
                 <div className="bg-purple-50 text-purple-500 p-3 rounded-xl"><Map size={24} /></div>
@@ -479,7 +531,74 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* TELA DE CASAS BLOQUEADAS */}
+        {/* TELA DE VISÃO GERAL DE PROGRESSO */}
+        {activeTab === 'progresso' && (
+          <div className="bg-white rounded-3xl p-5 sm:p-8 shadow-sm border border-gray-100">
+             <p className="text-sm text-gray-500 mb-6 font-medium">
+               Acompanhe de forma fácil quais territórios e quadras precisam de mais atenção nesta campanha.
+             </p>
+             <div className="flex flex-col gap-3">
+               {progressoData.map((t) => {
+                 const pct = t.total > 0 ? Math.round((t.completos / t.total) * 100) : 0;
+                 const faltam = t.total - t.completos;
+                 const isExpanded = expandedTerritorio === t.nome;
+                 
+                 return (
+                   <div key={t.nome} className={`border rounded-2xl transition-all overflow-hidden ${isExpanded ? 'border-blue-200 shadow-md' : 'border-gray-100 shadow-sm hover:border-gray-200'}`}>
+                     <button 
+                       onClick={() => setExpandedTerritorio(isExpanded ? null : t.nome)}
+                       className={`w-full flex items-center justify-between p-4 sm:p-5 text-left transition-colors ${isExpanded ? 'bg-blue-50/50' : 'bg-white'}`}
+                     >
+                        <div className="flex-1 pr-4">
+                          <h3 className="font-bold text-slate-800 text-[15px] sm:text-lg mb-1">{t.nome}</h3>
+                          <p className="text-[11px] sm:text-xs text-gray-500 font-medium leading-tight">
+                            {faltam === 0 ? (
+                              <span className="text-green-600 font-bold">Todas as {t.total} casas concluídas! 🎉</span>
+                            ) : (
+                              <span>Faltam <strong className="text-slate-700">{faltam}</strong> casas de {t.total}</span>
+                            )}
+                          </p>
+                          <div className="w-full bg-gray-200 rounded-full h-1.5 mt-3 overflow-hidden">
+                            <div className={`h-full rounded-full ${pct === 100 ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${pct}%` }}></div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={`text-sm sm:text-lg font-black ${pct === 100 ? 'text-green-500' : 'text-blue-600'}`}>{pct}%</span>
+                          <ChevronDown size={20} className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                        </div>
+                     </button>
+                     
+                     {isExpanded && (
+                       <div className="bg-slate-50 border-t border-gray-100 p-4 sm:p-6 flex flex-col gap-2.5">
+                         {t.quadras.map((q: any) => {
+                           const qPct = q.total > 0 ? Math.round((q.completos / q.total) * 100) : 0;
+                           const qFaltam = q.total - q.completos;
+                           
+                           return (
+                             <div key={q.nome} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white rounded-xl border border-gray-100 shadow-sm gap-2">
+                               <div className="flex-1">
+                                 <h4 className="font-bold text-slate-700 text-[13px]">{q.nome}</h4>
+                                 <p className="text-[10px] sm:text-[11px] text-gray-500 mt-0.5">
+                                   {qFaltam === 0 ? 'Concluída' : `Faltam ${qFaltam} de ${q.total}`}
+                                 </p>
+                               </div>
+                               <div className="flex items-center gap-2 sm:w-1/3">
+                                 <div className="flex-1 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                                    <div className={`h-full rounded-full ${qPct === 100 ? 'bg-green-400' : 'bg-blue-400'}`} style={{ width: `${qPct}%` }}></div>
+                                 </div>
+                                 <span className="text-[10px] font-bold text-slate-600 w-8 text-right">{qPct}%</span>
+                               </div>
+                             </div>
+                           );
+                         })}
+                       </div>
+                     )}
+                   </div>
+                 );
+               })}
+             </div>
+          </div>
+        )}
         {activeTab === 'bloqueadas' && (
           <div className="bg-white rounded-3xl p-5 sm:p-8 shadow-sm border border-gray-100">
             {enderecosBloqueados.length === 0 ? (
