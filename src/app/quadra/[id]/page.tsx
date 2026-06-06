@@ -50,7 +50,7 @@ export default function QuadraPage() {
         // Agrupa os endereços por nome da rua
         const agrupados: Record<string, any[]> = {};
         
-        // Retorna na ordem natural do banco de dados (que reflete a ordem da planilha CSV importada)
+        // Retorna na ordem natural do banco de dados
         const sortedEnderecos = (data.enderecos || []);
 
         sortedEnderecos.forEach((e: any) => {
@@ -58,6 +58,34 @@ export default function QuadraPage() {
           if (!agrupados[rua]) agrupados[rua] = [];
           agrupados[rua].push(e);
         });
+
+        // Ordena do menor para o maior, jogando SN (Sem Número) para o final
+        for (const rua in agrupados) {
+          agrupados[rua].sort((a, b) => {
+             const numA = String(a.numero || '').toLowerCase().trim();
+             const numB = String(b.numero || '').toLowerCase().trim();
+             
+             const isSnA = numA === 'sn' || numA === 's/n' || numA === 's.n' || numA === '';
+             const isSnB = numB === 'sn' || numB === 's/n' || numB === 's.n' || numB === '';
+             
+             if (isSnA && !isSnB) return 1;
+             if (!isSnA && isSnB) return -1;
+             
+             // Extrair a parte numérica
+             const matchA = numA.match(/\d+/);
+             const matchB = numB.match(/\d+/);
+             
+             const intA = matchA ? parseInt(matchA[0], 10) : 0;
+             const intB = matchB ? parseInt(matchB[0], 10) : 0;
+             
+             if (intA !== intB) {
+               return intA - intB;
+             }
+             
+             // Se o número for igual (ex: 108a e 108b), desempatar pelas letras
+             return numA.localeCompare(numB);
+          });
+        }
 
         setEnderecosAgrupados(agrupados);
       }
