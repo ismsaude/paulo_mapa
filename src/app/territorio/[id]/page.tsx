@@ -52,7 +52,8 @@ export default function TerritorioPage() {
               id: q.id,
               nome: q.nome,
               progresso,
-              totalEnderecos
+              totalEnderecos,
+              completos
             };
           });
           
@@ -145,8 +146,14 @@ export default function TerritorioPage() {
                 <p className="text-[10px] text-gray-400 mb-4 uppercase">Concluído</p>
 
                 <div className="w-full border-t border-gray-50 pt-3 flex flex-col items-center">
-                  <span className="text-[11px] text-gray-500 mb-1">{q.totalEnderecos} endereços</span>
-                  <button className="text-[10px] font-bold text-blue-600 flex items-center justify-center gap-1 uppercase">
+                  <span className="text-[11px] text-gray-500 mb-1 text-center leading-tight">
+                    {q.totalEnderecos === 0 
+                      ? 'Nenhuma casa'
+                      : q.totalEnderecos === q.completos 
+                        ? `Todas as ${q.totalEnderecos} casas concluídas`
+                        : `Faltam ${q.totalEnderecos - q.completos} casas de ${q.totalEnderecos}`}
+                  </span>
+                  <button className="text-[10px] font-bold text-blue-600 flex items-center justify-center gap-1 uppercase mt-1">
                     Ver endereços &rarr;
                   </button>
                 </div>
