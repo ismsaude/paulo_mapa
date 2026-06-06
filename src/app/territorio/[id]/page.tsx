@@ -20,7 +20,7 @@ export default function TerritorioPage() {
       try {
         const { data, error } = await supabase
           .from('territorios')
-          .select('id, nome, bairro, quadras(id, nome, enderecos(status))')
+          .select('id, nome, bairro, quadras(id, nome, enderecos(status, is_bloqueado))')
           .eq('id', params.id as string)
           .single();
 
@@ -39,7 +39,8 @@ export default function TerritorioPage() {
             q.enderecos?.forEach((e: any) => {
               totalEnderecos++;
               const status = String(e.status).toLowerCase();
-              if (status === 'true' || status === 'falado' || status === 'cartas') {
+              const isBloqueado = status === 'bloqueado' || e.is_bloqueado === true || String(e.is_bloqueado).toLowerCase() === 'true';
+              if (status === 'true' || status === 'falado' || status === 'cartas' || isBloqueado) {
                 completos++;
               }
             });
