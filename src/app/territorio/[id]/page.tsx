@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, ArrowRight, X, Map as MapIcon } from 'lucide-react';
+import { ArrowLeft, ArrowRight, X, Map as MapIcon, Edit2, Check } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import MapModal from '@/components/MapModal';
@@ -12,6 +12,19 @@ export default function TerritorioPage() {
   const [quadras, setQuadras] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isMapOpen, setIsMapOpen] = useState(false);
+  const [isAdminUser, setIsAdminUser] = useState(false);
+
+  // States para edição inline
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+
+  useEffect(() => {
+    const adminMode = localStorage.getItem('isAdmin') === 'true';
+    const role = localStorage.getItem('userRole');
+    if (adminMode && role === 'admin') {
+      setIsAdminUser(true);
+    }
+  }, []);
 
   useEffect(() => {
     async function fetchQuadras() {
@@ -78,6 +91,28 @@ export default function TerritorioPage() {
     return "#22c55e"; // green
   };
 
+  const handleSaveName = async (id: string) => {
+    if (!editName.trim()) {
+      setEditingId(null);
+      return;
+    }
+    
+    // Atualiza na tela imediatamente
+    setQuadras(prev => prev.map(q => q.id === id ? { ...q, nome: editName } : q));
+    setEditingId(null);
+
+    // Salva no banco
+    const { error } = await supabase
+      .from('quadras')
+      .update({ nome: editName })
+      .eq('id', id);
+
+    if (error) {
+      console.error("Erro ao atualizar nome da quadra:", error);
+      alert("Houve um erro ao tentar renomear a quadra.");
+    }
+  };
+
   if (loading) {
     return (
       <main className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -123,16 +158,43 @@ export default function TerritorioPage() {
             </div>
           ) : (
             quadras.map((q) => (
-              <Link 
-                href={`/quadra/${q.id}`} 
-                key={q.id} 
-                className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col items-center cursor-pointer transition-transform hover:scale-105"
-              >
-                <h2 className="font-bold text-slate-900 uppercase text-center mb-1">{q.nome}</h2>
+              <div key={q.id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col items-center relative">
+                
+                {/* EDIÇÃO INLINE */}
+                {editingId === q.id ? (
+                  <div className="flex items-center justify-center gap-2 mb-1 w-full z-10" onClick={e => e.stopPropagation()}>
+                    <input 
+                      type="text" 
+                      value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleSaveName(q.id)}
+                      className="w-full text-center border-b-2 border-slate-400 focus:border-[#0A4D3C] outline-none font-bold text-slate-900 uppercase text-[12px] bg-gray-50"
+                      autoFocus
+                    />
+                    <button onClick={() => handleSaveName(q.id)} className="p-1.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200">
+                      <Check size={14} strokeWidth={3} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-2 mb-1 z-10 w-full" onClick={e => e.stopPropagation()}>
+                    <h2 className="font-bold text-slate-900 uppercase text-center">{q.nome}</h2>
+                    {isAdminUser && (
+                      <button 
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditName(q.nome); setEditingId(q.id); }}
+                        className="p-1 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-md transition-colors flex-shrink-0"
+                        title="Renomear quadra"
+                      >
+                        <Edit2 size={12} />
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 <p className="text-[10px] text-gray-400 mb-4 uppercase">{territorio?.bairro || 'Santa Rita'}</p>
 
-                {/* Círculo de Progresso */}
-                <div className="relative w-20 h-20 flex items-center justify-center mb-4">
+                <Link href={`/quadra/${q.id}`} className="flex flex-col items-center cursor-pointer transition-transform hover:scale-[1.02] w-full">
+                  {/* Círculo de Progresso */}
+                  <div className="relative w-20 h-20 flex items-center justify-center mb-4">
                   <svg className="w-full h-full -rotate-90">
                     <circle cx="40" cy="40" r="34" stroke="#f1f5f9" strokeWidth="6" fill="none" />
                     <circle 
@@ -158,7 +220,8 @@ export default function TerritorioPage() {
                     Ver endereços &rarr;
                   </button>
                 </div>
-              </Link>
+                </Link>
+              </div>
             ))
           )}
         </div>

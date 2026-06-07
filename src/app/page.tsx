@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { ArrowRight, X, Settings, Map as MapIcon } from 'lucide-react';
+import { ArrowRight, X, Settings, Map as MapIcon, Edit2, Check } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import MapModal from '@/components/MapModal';
@@ -9,8 +9,21 @@ export default function Home() {
   const [territorios, setTerritorios] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isMapOpen, setIsMapOpen] = useState(false);
+  const [isAdminUser, setIsAdminUser] = useState(false);
+  
+  // States para edição inline
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
 
-  // ... (use effect stays the same)
+  useEffect(() => {
+    // Checa se o usuário atual é admin logado
+    const adminMode = localStorage.getItem('isAdmin') === 'true';
+    const role = localStorage.getItem('userRole');
+    if (adminMode && role === 'admin') {
+      setIsAdminUser(true);
+    }
+  }, []);
+
   useEffect(() => {
     async function fetchTerritorios() {
       try {
@@ -82,6 +95,28 @@ export default function Home() {
     return "#22c55e"; // Verde
   };
 
+  const handleSaveName = async (id: string) => {
+    if (!editName.trim()) {
+      setEditingId(null);
+      return;
+    }
+    
+    // Atualiza na tela imediatamente
+    setTerritorios(prev => prev.map(t => t.id === id ? { ...t, nome: editName } : t));
+    setEditingId(null);
+
+    // Salva no banco de dados
+    const { error } = await supabase
+      .from('territorios')
+      .update({ nome: editName })
+      .eq('id', id);
+
+    if (error) {
+      console.error("Erro ao atualizar nome:", error);
+      alert("Houve um erro ao tentar renomear o território.");
+    }
+  };
+
   if (loading) {
     return (
       <main className="min-h-screen bg-gray-50 p-4 flex items-center justify-center">
@@ -115,12 +150,43 @@ export default function Home() {
       {/* GRID DE 2 COLUNAS FIXAS (Funciona em mobile e PC) */}
       <div className="grid grid-cols-2 gap-4 max-w-4xl mx-auto">
         {territorios.map((t) => (
-          <Link href={`/territorio/${t.id}`} key={t.id} className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col items-center cursor-pointer transition-transform hover:scale-105">
-            <h2 className="font-bold text-gray-800 uppercase text-center">{t.nome}</h2>
+          <div key={t.id} className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col items-center relative">
+            
+            {/* EDIÇÃO INLINE */}
+            {editingId === t.id ? (
+              <div className="flex items-center justify-center gap-2 mb-2 w-full z-10" onClick={e => e.stopPropagation()}>
+                <input 
+                  type="text" 
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSaveName(t.id)}
+                  className="w-full text-center border-b-2 border-slate-400 focus:border-[#0A4D3C] outline-none font-bold text-gray-800 uppercase text-[13px] bg-gray-50"
+                  autoFocus
+                />
+                <button onClick={() => handleSaveName(t.id)} className="p-1.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200">
+                  <Check size={14} strokeWidth={3} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center gap-2 mb-1 z-10 w-full" onClick={e => e.stopPropagation()}>
+                <h2 className="font-bold text-gray-800 uppercase text-center">{t.nome}</h2>
+                {isAdminUser && (
+                  <button 
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditName(t.nome); setEditingId(t.id); }}
+                    className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors flex-shrink-0"
+                    title="Renomear território"
+                  >
+                    <Edit2 size={12} />
+                  </button>
+                )}
+              </div>
+            )}
+            
             <p className="text-[10px] text-gray-400 mb-4 uppercase">{t.bairro}</p>
 
-            {/* Círculo de Progresso */}
-            <div className="relative w-20 h-20 flex items-center justify-center mb-4">
+            <Link href={`/territorio/${t.id}`} className="flex flex-col items-center cursor-pointer transition-transform hover:scale-[1.02] w-full">
+              {/* Círculo de Progresso */}
+              <div className="relative w-20 h-20 flex items-center justify-center mb-4">
               <svg className="w-full h-full -rotate-90">
                 <circle cx="40" cy="40" r="34" stroke="#f1f5f9" strokeWidth="6" fill="none" />
                 <circle 
@@ -144,7 +210,8 @@ export default function Home() {
                 VER QUADRAS <ArrowRight size={14} />
               </button>
             </div>
-          </Link>
+            </Link>
+          </div>
         ))}
       </div>
 

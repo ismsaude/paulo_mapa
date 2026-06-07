@@ -2,6 +2,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Check, Edit2, X, UserCheck, Mail, Ban, Map as MapIcon } from 'lucide-react';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, rectSortingStrategy } from '@dnd-kit/sortable';
+import DraggableEndereco from '@/components/DraggableEndereco';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import MapModal from '@/components/MapModal';
@@ -19,7 +22,24 @@ export default function QuadraPage() {
   const [modalAberto, setModalAberto] = useState(false);
   const [enderecoSelecionado, setEnderecoSelecionado] = useState<any>(null);
 
+  // Estados Admin e Edição
+  const [isAdminUser, setIsAdminUser] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editNumero, setEditNumero] = useState("");
+  const [editingRuaStr, setEditingRuaStr] = useState<string | null>(null);
+  const [editRuaName, setEditRuaName] = useState("");
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
   useEffect(() => {
+    const adminMode = localStorage.getItem('isAdmin') === 'true';
+    const role = localStorage.getItem('userRole');
+    if (adminMode && role === 'admin') {
+      setIsAdminUser(true);
+    }
     fetchQuadraEEnderecos();
   }, [params?.id]);
 
@@ -59,9 +79,15 @@ export default function QuadraPage() {
           agrupados[rua].push(e);
         });
 
-        // Ordena do menor para o maior, jogando SN (Sem Número) para o final
+        // Ordena
         for (const rua in agrupados) {
           agrupados[rua].sort((a, b) => {
+             // Se tiver ordem definida no BD, ela tem prioridade absoluta
+             if (a.ordem !== undefined && b.ordem !== undefined && (a.ordem !== 0 || b.ordem !== 0)) {
+               return (a.ordem || 0) - (b.ordem || 0);
+             }
+
+             // Se não tiver ordem, cai no sort normal (por número/SN)
              const numA = String(a.numero || '').toLowerCase().trim();
              const numB = String(b.numero || '').toLowerCase().trim();
              
@@ -71,18 +97,13 @@ export default function QuadraPage() {
              if (isSnA && !isSnB) return 1;
              if (!isSnA && isSnB) return -1;
              
-             // Extrair a parte numérica
              const matchA = numA.match(/\d+/);
              const matchB = numB.match(/\d+/);
              
              const intA = matchA ? parseInt(matchA[0], 10) : 0;
              const intB = matchB ? parseInt(matchB[0], 10) : 0;
              
-             if (intA !== intB) {
-               return intA - intB;
-             }
-             
-             // Se o número for igual (ex: 108a e 108b), desempatar pelas letras
+             if (intA !== intB) return intA - intB;
              return numA.localeCompare(numB);
           });
         }
@@ -163,6 +184,63 @@ export default function QuadraPage() {
     }
   };
 
+  const handleSaveNumero = async (id: string) => {
+    if (!editNumero.trim()) { setEditId(null); return; }
+    
+    // update local
+    setEnderecosAgrupados(prev => {
+      const novo = { ...prev };
+      for (const rua in novo) {
+        novo[rua] = novo[rua].map(e => e.id === id ? { ...e, numero: editNumero } : e);
+      }
+      return novo;
+    });
+    setEditId(null);
+    
+    await supabase.from('enderecos').update({ numero: editNumero }).eq('id', id);
+  };
+
+  const handleSaveRua = async (oldRua: string) => {
+    if (!editRuaName.trim() || editRuaName === oldRua) { setEditingRuaStr(null); return; }
+    
+    const endsToUpdate = enderecosAgrupados[oldRua];
+    if (!endsToUpdate) return;
+    
+    // update local
+    setEnderecosAgrupados(prev => {
+      const novo = { ...prev };
+      novo[editRuaName] = novo[oldRua].map(e => ({ ...e, rua: editRuaName }));
+      delete novo[oldRua];
+      return novo;
+    });
+    setEditingRuaStr(null);
+    
+    const ids = endsToUpdate.map((e: any) => e.id);
+    await supabase.from('enderecos').update({ rua: editRuaName }).in('id', ids);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent, ruaId: string) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    setEnderecosAgrupados((prev) => {
+      const oldIndex = prev[ruaId].findIndex((x: any) => x.id === active.id);
+      const newIndex = prev[ruaId].findIndex((x: any) => x.id === over.id);
+      
+      const newArray = arrayMove(prev[ruaId], oldIndex, newIndex);
+      
+      // Update the DB immediately in background
+      Promise.all(newArray.map((end, index) => {
+        return supabase.from('enderecos').update({ ordem: index }).eq('id', end.id);
+      })).catch(err => console.error("Erro ao salvar ordem", err));
+
+      return {
+        ...prev,
+        [ruaId]: newArray,
+      };
+    });
+  };
+
   const formatData = (dateString: string) => {
     if (!dateString) return "";
     const [year, month, day] = dateString.split('-');
@@ -228,84 +306,75 @@ export default function QuadraPage() {
             <div key={rua} className="mb-6 rounded-xl border border-gray-100 overflow-hidden shadow-sm">
               
               {/* TÍTULO DA RUA */}
-              <div className="bg-gray-50 px-4 py-3 font-semibold text-slate-800 text-lg border-b border-gray-100">
-                {rua}
-              </div>
+              {editingRuaStr === rua ? (
+                <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex items-center gap-2 w-full">
+                  <input 
+                    type="text" 
+                    value={editRuaName}
+                    onChange={e => setEditRuaName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSaveRua(rua)}
+                    className="flex-1 border-b-2 border-slate-400 focus:border-[#0A4D3C] outline-none font-semibold text-slate-800 text-lg bg-gray-50"
+                    autoFocus
+                  />
+                  <button onClick={() => handleSaveRua(rua)} className="p-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200">
+                    <Check size={16} strokeWidth={3} />
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-gray-50 px-4 py-3 font-semibold text-slate-800 text-lg border-b border-gray-100 flex items-center justify-between">
+                  {rua}
+                  {isAdminUser && (
+                    <button 
+                      onClick={() => { setEditRuaName(rua); setEditingRuaStr(rua); }}
+                      className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors"
+                      title="Editar nome da Rua"
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                  )}
+                </div>
+              )}
               
               {/* GRID 2 COLUNAS */}
-              <div className="grid grid-cols-2">
-                {enderecos.map((end) => {
-                  const taVazio = isVazioOuLivre(end.status);
-                  const isBloqueado = String(end.status).toLowerCase() === 'bloqueado' || end.is_bloqueado === true || String(end.is_bloqueado).toLowerCase() === 'true';
+              <DndContext 
+                sensors={sensors} 
+                collisionDetection={closestCenter} 
+                onDragEnd={(e) => handleDragEnd(e, rua)}
+              >
+                <SortableContext items={enderecos.map(e => e.id)} strategy={rectSortingStrategy}>
+                  <div className="grid grid-cols-2">
+                    {enderecos.map((end) => {
+                      const taVazio = isVazioOuLivre(end.status);
+                      const isBloqueado = String(end.status).toLowerCase() === 'bloqueado' || end.is_bloqueado === true || String(end.is_bloqueado).toLowerCase() === 'true';
 
-                  let bgStatus = 'bg-white';
-                  if (isBloqueado) {
-                    bgStatus = 'bg-red-50/60 hover:bg-red-100/50';
-                  } else if (!taVazio) {
-                    if (String(end.status).toLowerCase() === 'cartas') {
-                      bgStatus = 'bg-blue-50/60 hover:bg-blue-100/50';
-                    } else {
-                      bgStatus = 'bg-green-50/60 hover:bg-green-100/50';
-                    }
-                  } else {
-                    bgStatus = 'bg-white hover:bg-slate-50';
-                  }
+                      let bgStatus = 'bg-white';
+                      if (isBloqueado) bgStatus = 'bg-red-50/60 hover:bg-red-100/50';
+                      else if (!taVazio) {
+                        if (String(end.status).toLowerCase() === 'cartas') bgStatus = 'bg-blue-50/60 hover:bg-blue-100/50';
+                        else bgStatus = 'bg-green-50/60 hover:bg-green-100/50';
+                      } else bgStatus = 'bg-white hover:bg-slate-50';
 
-                  return (
-                    <button 
-                      key={end.id}
-                      onClick={() => handleEnderecoClick(end)}
-                      className={`
-                        w-full text-left p-3 flex items-center min-h-[48px]
-                        ${bgStatus} transition-colors
-                        border-b border-gray-100 
-                        [&:nth-child(odd)]:border-r
-                        [&:nth-last-child(-n+2)]:border-b-0
-                      `}
-                    >
-                       <div className="flex items-center gap-2.5 w-full">
-                         
-                         {/* Lado Esquerdo: Ícone + Checkbox */}
-                         <div className="flex items-center gap-2 flex-shrink-0 w-14 justify-end">
-                            {!taVazio && !isBloqueado && (String(end.status).toLowerCase() === 'cartas' ? (
-                              <span className="text-[14px] leading-none">✉️</span>
-                            ) : (
-                              <span className="text-[14px] leading-none">🗣️</span>
-                            ))}
-                            {isBloqueado && (
-                              <span className="text-[12px] leading-none">❌</span>
-                            )}
-                            
-                            {/* Checkbox em si */}
-                            <div className={`w-8 h-8 rounded flex items-center justify-center border-[3px] font-bold flex-shrink-0
-                              ${!taVazio && !isBloqueado ? 'bg-gray-200 border-black' : 'bg-white border-black'}
-                              ${isBloqueado ? 'bg-gray-100 border-gray-400' : ''}
-                            `}>
-                              {!taVazio && !isBloqueado && (
-                                <Check size={20} strokeWidth={4} className="text-black" />
-                              )}
-                            </div>
-                         </div>
-
-                         {/* Lado Direito: Número e Data */}
-                         <div className="flex items-center gap-2 flex-wrap">
-                           <span className={`text-xl font-bold leading-none ${isBloqueado ? 'line-through text-gray-500' : 'text-slate-800'}`}>
-                             {end.numero}
-                           </span>
-                           {!taVazio && !isBloqueado && end.data_visita && (
-                             <span className="text-xs text-gray-500 font-medium leading-none">
-                               ({formatData(end.data_visita)})
-                             </span>
-                           )}
-                           {isBloqueado && (
-                             <span className="text-xs text-gray-400 leading-none">Não Visitar</span>
-                           )}
-                         </div>
-                       </div>
-                    </button>
-                  );
-                })}
-              </div>
+                      return (
+                        <DraggableEndereco
+                          key={end.id}
+                          end={end}
+                          onEnderecoClick={handleEnderecoClick}
+                          isBloqueado={isBloqueado}
+                          taVazio={taVazio}
+                          bgStatus={bgStatus}
+                          formatData={formatData}
+                          isAdminUser={isAdminUser}
+                          editId={editId}
+                          editNumero={editNumero}
+                          setEditNumero={setEditNumero}
+                          handleSaveNumero={handleSaveNumero}
+                          setEditId={setEditId}
+                        />
+                      );
+                    })}
+                  </div>
+                </SortableContext>
+              </DndContext>
             </div>
           ))}
         </div>
