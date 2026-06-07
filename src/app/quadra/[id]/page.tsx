@@ -3,8 +3,9 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Check, Edit2, X, UserCheck, Mail, Ban, Map as MapIcon, Settings, LogOut } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
-import { SortableContext, arrayMove, sortableKeyboardCoordinates, rectSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, rectSortingStrategy, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import DraggableEndereco from '@/components/DraggableEndereco';
+import DraggableRua from '@/components/DraggableRua';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import MapModal from '@/components/MapModal';
@@ -14,7 +15,7 @@ export default function QuadraPage() {
   const router = useRouter();
   
   const [quadra, setQuadra] = useState<any>(null);
-  const [enderecosAgrupados, setEnderecosAgrupados] = useState<Record<string, any[]>>({});
+  const [ruasAgrupadas, setRuasAgrupadas] = useState<{rua: string, ordem_rua: number, enderecos: any[]}[]>([]);
   const [loading, setLoading] = useState(true);
   const [isMapOpen, setIsMapOpen] = useState(false);
 
@@ -98,9 +99,27 @@ export default function QuadraPage() {
           agrupados[rua].push(e);
         });
 
-        // Ordena
-        for (const rua in agrupados) {
-          agrupados[rua].sort((a, b) => {
+        // Converte para Array de Ruas
+        const ruasArray = Object.keys(agrupados).map(rua => {
+           const ordem_rua = agrupados[rua].find(e => e.ordem_rua && e.ordem_rua !== 0)?.ordem_rua || 0;
+           return {
+             rua,
+             ordem_rua,
+             enderecos: agrupados[rua]
+           }
+        });
+
+        // Ordena as ruas entre si
+        ruasArray.sort((a, b) => {
+          if (a.ordem_rua !== 0 || b.ordem_rua !== 0) {
+            return a.ordem_rua - b.ordem_rua;
+          }
+          return a.rua.localeCompare(b.rua);
+        });
+
+        // Ordena os endereços dentro de cada rua
+        ruasArray.forEach(r => {
+          r.enderecos.sort((a, b) => {
              // Se tiver ordem definida no BD, ela tem prioridade absoluta
              if (a.ordem !== undefined && b.ordem !== undefined && (a.ordem !== 0 || b.ordem !== 0)) {
                return (a.ordem || 0) - (b.ordem || 0);
@@ -125,9 +144,9 @@ export default function QuadraPage() {
              if (intA !== intB) return intA - intB;
              return numA.localeCompare(numB);
           });
-        }
+        });
 
-        setEnderecosAgrupados(agrupados);
+        setRuasAgrupadas(ruasArray);
       }
     } catch (err) {
       console.error("Erro inesperado:", err);
@@ -171,10 +190,10 @@ export default function QuadraPage() {
       const hoje = String(novoStatus).toLowerCase() === 'false' ? null : new Date().toISOString().split('T')[0];
 
       // Atualiza na view state imediatamente pra UX ficar rápida
-      setEnderecosAgrupados(prev => {
-        const novo = { ...prev };
-        for (const rua in novo) {
-          novo[rua] = novo[rua].map(e => 
+      setRuasAgrupadas(prev => {
+        const novo = [...prev];
+        for (let i = 0; i < novo.length; i++) {
+          novo[i].enderecos = novo[i].enderecos.map(e => 
             e.id === enderecoId ? { ...e, status: novoStatus, data_visita: hoje } : e
           );
         }
@@ -207,10 +226,10 @@ export default function QuadraPage() {
     if (!editNumero.trim()) { setEditId(null); return; }
     
     // update local
-    setEnderecosAgrupados(prev => {
-      const novo = { ...prev };
-      for (const rua in novo) {
-        novo[rua] = novo[rua].map(e => e.id === id ? { ...e, numero: editNumero } : e);
+    setRuasAgrupadas(prev => {
+      const novo = [...prev];
+      for (let i = 0; i < novo.length; i++) {
+        novo[i].enderecos = novo[i].enderecos.map(e => e.id === id ? { ...e, numero: editNumero } : e);
       }
       return novo;
     });
@@ -222,42 +241,81 @@ export default function QuadraPage() {
   const handleSaveRua = async (oldRua: string) => {
     if (!editRuaName.trim() || editRuaName === oldRua) { setEditingRuaStr(null); return; }
     
-    const endsToUpdate = enderecosAgrupados[oldRua];
-    if (!endsToUpdate) return;
+    const ruaIndex = ruasAgrupadas.findIndex(r => r.rua === oldRua);
+    if (ruaIndex === -1) return;
     
     // update local
-    setEnderecosAgrupados(prev => {
-      const novo = { ...prev };
-      novo[editRuaName] = novo[oldRua].map(e => ({ ...e, rua: editRuaName }));
-      delete novo[oldRua];
+    setRuasAgrupadas(prev => {
+      const novo = [...prev];
+      novo[ruaIndex] = { 
+        ...novo[ruaIndex], 
+        rua: editRuaName,
+        enderecos: novo[ruaIndex].enderecos.map(e => ({ ...e, rua: editRuaName }))
+      };
       return novo;
     });
     setEditingRuaStr(null);
     
-    const ids = endsToUpdate.map((e: any) => e.id);
+    const ids = ruasAgrupadas[ruaIndex].enderecos.map((e: any) => e.id);
     await supabase.from('enderecos').update({ rua: editRuaName }).in('id', ids);
   };
 
-  const handleDragEnd = async (event: DragEndEvent, ruaId: string) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    setEnderecosAgrupados((prev) => {
-      const oldIndex = prev[ruaId].findIndex((x: any) => x.id === active.id);
-      const newIndex = prev[ruaId].findIndex((x: any) => x.id === over.id);
-      
-      const newArray = arrayMove(prev[ruaId], oldIndex, newIndex);
-      
-      // Update the DB immediately in background
-      Promise.all(newArray.map((end, index) => {
-        return supabase.from('enderecos').update({ ordem: index }).eq('id', end.id);
-      })).catch(err => console.error("Erro ao salvar ordem", err));
+    const activeId = String(active.id);
+    const overId = String(over.id);
 
-      return {
-        ...prev,
-        [ruaId]: newArray,
-      };
-    });
+    // Se estiver arrastando uma RUA inteira
+    if (activeId.startsWith('rua-') && overId.startsWith('rua-')) {
+       setRuasAgrupadas(prev => {
+          const oldIndex = prev.findIndex(r => `rua-${r.rua}` === activeId);
+          const newIndex = prev.findIndex(r => `rua-${r.rua}` === overId);
+          const newArray = arrayMove(prev, oldIndex, newIndex);
+          
+          // Salva ordem das ruas no BD
+          Promise.all(newArray.map((r, index) => {
+             const ids = r.enderecos.map((e: any) => e.id);
+             return supabase.from('enderecos').update({ ordem_rua: index }).in('id', ids);
+          })).catch(err => console.error("Erro ao salvar ordem das ruas", err));
+
+          return newArray;
+       });
+       return;
+    }
+
+    // Se estiver arrastando um ENDEREÇO dentro da rua
+    let ruaIndex = -1;
+    let isEnderecoDrag = false;
+
+    // Acha a rua que contém este endereço (assumindo drag and drop apenas dentro da mesma rua por enquanto)
+    for (let i = 0; i < ruasAgrupadas.length; i++) {
+       if (ruasAgrupadas[i].enderecos.some(e => String(e.id) === activeId)) {
+          ruaIndex = i;
+          isEnderecoDrag = true;
+          break;
+       }
+    }
+
+    if (isEnderecoDrag && ruaIndex !== -1) {
+       setRuasAgrupadas(prev => {
+          const novo = [...prev];
+          const oldIndex = novo[ruaIndex].enderecos.findIndex(x => String(x.id) === activeId);
+          const newIndex = novo[ruaIndex].enderecos.findIndex(x => String(x.id) === overId);
+          
+          if (oldIndex !== -1 && newIndex !== -1) {
+             const newArray = arrayMove(novo[ruaIndex].enderecos, oldIndex, newIndex);
+             novo[ruaIndex] = { ...novo[ruaIndex], enderecos: newArray };
+             
+             // Salva no BD em bg
+             Promise.all(newArray.map((end, index) => {
+                return supabase.from('enderecos').update({ ordem: index }).eq('id', end.id);
+             })).catch(err => console.error("Erro ao salvar ordem dos endereços", err));
+          }
+          return novo;
+       });
+    }
   };
 
   const formatData = (dateString: string) => {
@@ -338,81 +396,61 @@ export default function QuadraPage() {
 
         {/* LISTAGEM DE ENDEREÇOS AGRUPADOS */}
         <div className="w-full">
-          {Object.entries(enderecosAgrupados).map(([rua, enderecos]) => (
-            <div key={rua} className="mb-6 rounded-xl border border-gray-100 overflow-hidden shadow-sm">
-              
-              {/* TÍTULO DA RUA */}
-              {editingRuaStr === rua ? (
-                <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex items-center gap-2 w-full">
-                  <input 
-                    type="text" 
-                    value={editRuaName}
-                    onChange={e => setEditRuaName(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSaveRua(rua)}
-                    className="flex-1 border-b-2 border-slate-400 focus:border-[#0A4D3C] outline-none font-semibold text-slate-800 text-lg bg-gray-50"
-                    autoFocus
-                  />
-                  <button onClick={() => handleSaveRua(rua)} className="p-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200">
-                    <Check size={16} strokeWidth={3} />
-                  </button>
-                </div>
-              ) : (
-                <div className="bg-gray-50 px-4 py-3 font-semibold text-slate-800 text-lg border-b border-gray-100 flex items-center justify-between">
-                  {rua}
-                  {isAdminUser && (
-                    <button 
-                      onClick={() => { setEditRuaName(rua); setEditingRuaStr(rua); }}
-                      className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors"
-                      title="Editar nome da Rua"
-                    >
-                      <Edit2 size={14} />
-                    </button>
-                  )}
-                </div>
-              )}
-              
-              {/* GRID 2 COLUNAS */}
-              <DndContext 
-                sensors={sensors} 
-                collisionDetection={closestCenter} 
-                onDragEnd={(e) => handleDragEnd(e, rua)}
-              >
-                <SortableContext items={enderecos.map(e => e.id)} strategy={rectSortingStrategy}>
-                  <div className="grid grid-cols-2">
-                    {enderecos.map((end) => {
-                      const taVazio = isVazioOuLivre(end.status);
-                      const isBloqueado = String(end.status).toLowerCase() === 'bloqueado' || end.is_bloqueado === true || String(end.is_bloqueado).toLowerCase() === 'true';
+          <DndContext 
+            sensors={sensors} 
+            collisionDetection={closestCenter} 
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={ruasAgrupadas.map(r => `rua-${r.rua}`)} strategy={verticalListSortingStrategy}>
+              {ruasAgrupadas.map((ruaGroup) => (
+                <DraggableRua 
+                  key={ruaGroup.rua}
+                  rua={ruaGroup.rua}
+                  ruaData={ruaGroup}
+                  isAdminUser={isAdminUser}
+                  editingRuaStr={editingRuaStr}
+                  editRuaName={editRuaName}
+                  setEditRuaName={setEditRuaName}
+                  handleSaveRua={handleSaveRua}
+                  setEditingRuaStr={setEditingRuaStr}
+                >
+                  <SortableContext items={ruaGroup.enderecos.map(e => e.id)} strategy={rectSortingStrategy}>
+                    <div className="grid grid-cols-2">
+                      {ruaGroup.enderecos.map((end) => {
+                        const taVazio = isVazioOuLivre(end.status);
+                        const isBloqueado = String(end.status).toLowerCase() === 'bloqueado' || end.is_bloqueado === true || String(end.is_bloqueado).toLowerCase() === 'true';
 
-                      let bgStatus = 'bg-white';
-                      if (isBloqueado) bgStatus = 'bg-red-50/60 hover:bg-red-100/50';
-                      else if (!taVazio) {
-                        if (String(end.status).toLowerCase() === 'cartas') bgStatus = 'bg-blue-50/60 hover:bg-blue-100/50';
-                        else bgStatus = 'bg-green-50/60 hover:bg-green-100/50';
-                      } else bgStatus = 'bg-white hover:bg-slate-50';
+                        let bgStatus = 'bg-white';
+                        if (isBloqueado) bgStatus = 'bg-red-50/60 hover:bg-red-100/50';
+                        else if (!taVazio) {
+                          if (String(end.status).toLowerCase() === 'cartas') bgStatus = 'bg-blue-50/60 hover:bg-blue-100/50';
+                          else bgStatus = 'bg-green-50/60 hover:bg-green-100/50';
+                        } else bgStatus = 'bg-white hover:bg-slate-50';
 
-                      return (
-                        <DraggableEndereco
-                          key={end.id}
-                          end={end}
-                          onEnderecoClick={handleEnderecoClick}
-                          isBloqueado={isBloqueado}
-                          taVazio={taVazio}
-                          bgStatus={bgStatus}
-                          formatData={formatData}
-                          isAdminUser={isAdminUser}
-                          editId={editId}
-                          editNumero={editNumero}
-                          setEditNumero={setEditNumero}
-                          handleSaveNumero={handleSaveNumero}
-                          setEditId={setEditId}
-                        />
-                      );
-                    })}
-                  </div>
-                </SortableContext>
-              </DndContext>
-            </div>
-          ))}
+                        return (
+                          <DraggableEndereco
+                            key={end.id}
+                            end={end}
+                            onEnderecoClick={handleEnderecoClick}
+                            isBloqueado={isBloqueado}
+                            taVazio={taVazio}
+                            bgStatus={bgStatus}
+                            formatData={formatData}
+                            isAdminUser={isAdminUser}
+                            editId={editId}
+                            editNumero={editNumero}
+                            setEditNumero={setEditNumero}
+                            handleSaveNumero={handleSaveNumero}
+                            setEditId={setEditId}
+                          />
+                        );
+                      })}
+                    </div>
+                  </SortableContext>
+                </DraggableRua>
+              ))}
+            </SortableContext>
+          </DndContext>
         </div>
 
         {/* MODAL DE AÇÕES */}
