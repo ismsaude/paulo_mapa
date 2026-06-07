@@ -63,6 +63,32 @@ export default function QuadraPage() {
     setIsAdminUser(false);
   };
 
+  // Escutar mudanças em tempo real no banco
+  useEffect(() => {
+    if (!params?.id) return;
+
+    const channel = supabase
+      .channel('realtime-enderecos')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // UPDATE, INSERT, DELETE
+          schema: 'public',
+          table: 'enderecos',
+          filter: `quadra_id=eq.${params.id}`
+        },
+        () => {
+          // Quando alguém alterar um endereço (ex: marcar), atualiza a lista
+          fetchQuadraEEnderecos();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [params?.id]);
+
   async function fetchQuadraEEnderecos() {
     if (!params?.id) return;
     
