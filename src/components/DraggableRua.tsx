@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Edit2, Check } from 'lucide-react';
+import { Edit2, Check, Trash2 } from 'lucide-react';
 
 export default function DraggableRua({ 
   rua, 
@@ -11,6 +11,7 @@ export default function DraggableRua({
   setEditRuaName, 
   handleSaveRua, 
   setEditingRuaStr, 
+  handleDeleteRua,
   children 
 }: any) {
   const {
@@ -68,13 +69,22 @@ export default function DraggableRua({
           <span className={isAdminUser ? "ml-6" : ""}>{rua}</span>
           
           {isAdminUser && (
-            <button 
-              onClick={() => { setEditRuaName(rua); setEditingRuaStr(rua); }}
-              className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors"
-              title="Editar nome da Rua"
-            >
-              <Edit2 size={14} />
-            </button>
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={() => { setEditRuaName(rua); setEditingRuaStr(rua); }}
+                className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors"
+                title="Editar nome da Rua"
+              >
+                <Edit2 size={14} />
+              </button>
+              <button 
+                onClick={() => handleDeleteRua(rua)}
+                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                title="Excluir bloco inteiro"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
           )}
         </div>
       )}

@@ -1,8 +1,8 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Check } from 'lucide-react';
+import { Check, Trash2 } from 'lucide-react';
 
-export default function DraggableEndereco({ end, onEnderecoClick, isBloqueado, taVazio, bgStatus, formatData, isAdminUser, editId, editNumero, setEditNumero, handleSaveNumero, setEditId }: any) {
+export default function DraggableEndereco({ end, onEnderecoClick, isBloqueado, taVazio, bgStatus, formatData, isAdminUser, editId, editNumero, setEditNumero, handleSaveNumero, setEditId, handleDeleteEndereco }: any) {
   const {
     attributes,
     listeners,
@@ -103,6 +103,20 @@ export default function DraggableEndereco({ end, onEnderecoClick, isBloqueado, t
                  <span className="text-xs text-gray-400 leading-none">Não Visitar</span>
                )}
              </div>
+          )}
+          
+          {/* Botão de excluir número (apenas admin) */}
+          {isAdminUser && (
+            <div 
+              className="ml-auto p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+              title="Excluir este número"
+              onClick={(e) => {
+                 e.stopPropagation();
+                 handleDeleteEndereco(end.id);
+              }}
+            >
+              <Trash2 size={14} />
+            </div>
           )}
         </div>
       </button>

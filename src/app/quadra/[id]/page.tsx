@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Check, Edit2, X, UserCheck, Mail, Ban, Map as MapIcon, Settings, LogOut } from 'lucide-react';
+import { Check, Edit2, X, UserCheck, Mail, Ban, Map as MapIcon, Settings, LogOut, Trash2 } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, rectSortingStrategy, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import DraggableEndereco from '@/components/DraggableEndereco';
@@ -286,6 +286,37 @@ export default function QuadraPage() {
     await supabase.from('enderecos').update({ rua: editRuaName }).in('id', ids);
   };
 
+  const handleDeleteEndereco = async (id: string) => {
+    const confirmar = window.confirm("Certeza absoluta que deseja excluir este número de casa?");
+    if (!confirmar) return;
+
+    // update local
+    setRuasAgrupadas(prev => {
+      const novo = [...prev];
+      for (let i = 0; i < novo.length; i++) {
+        novo[i].enderecos = novo[i].enderecos.filter(e => e.id !== id);
+      }
+      return novo.filter(r => r.enderecos.length > 0); // remove rua se ficar vazia
+    });
+
+    await supabase.from('enderecos').delete().eq('id', id);
+  };
+
+  const handleDeleteRua = async (ruaName: string) => {
+    const confirmar = window.confirm(`Certeza que deseja excluir TODAS as casas da rua "${ruaName}"?`);
+    if (!confirmar) return;
+
+    const ruaIndex = ruasAgrupadas.findIndex(r => r.rua === ruaName);
+    if (ruaIndex === -1) return;
+
+    const ids = ruasAgrupadas[ruaIndex].enderecos.map((e: any) => e.id);
+
+    // update local
+    setRuasAgrupadas(prev => prev.filter(r => r.rua !== ruaName));
+
+    await supabase.from('enderecos').delete().in('id', ids);
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -439,6 +470,7 @@ export default function QuadraPage() {
                   setEditRuaName={setEditRuaName}
                   handleSaveRua={handleSaveRua}
                   setEditingRuaStr={setEditingRuaStr}
+                  handleDeleteRua={handleDeleteRua}
                 >
                   <SortableContext items={ruaGroup.enderecos.map(e => e.id)} strategy={rectSortingStrategy}>
                     <div className="grid grid-cols-2">
@@ -468,6 +500,7 @@ export default function QuadraPage() {
                             setEditNumero={setEditNumero}
                             handleSaveNumero={handleSaveNumero}
                             setEditId={setEditId}
+                            handleDeleteEndereco={handleDeleteEndereco}
                           />
                         );
                       })}
