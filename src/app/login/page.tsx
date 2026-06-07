@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Lock } from "lucide-react";
@@ -12,28 +12,13 @@ export default function LoginPage() {
   const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Verifica se já está logado e se a sessão é válida
-  useState(() => {
-    if (typeof window !== 'undefined') {
-      const admin = localStorage.getItem('isAdmin');
-      const loginTime = localStorage.getItem('loginTime');
-      if (admin === 'true' && loginTime) {
-        const tempoPassado = Date.now() - parseInt(loginTime, 10);
-        const umDiaEmMs = 24 * 60 * 60 * 1000;
-        
-        if (tempoPassado < umDiaEmMs) {
-          // Sessão válida, redireciona
-          router.push('/admin');
-        } else {
-          // Sessão expirou
-          localStorage.removeItem('isAdmin');
-          localStorage.removeItem('userName');
-          localStorage.removeItem('userRole');
-          localStorage.removeItem('loginTime');
-        }
-      }
+  useEffect(() => {
+    const isAdmin = localStorage.getItem('isAdmin');
+    const expiry = localStorage.getItem('loginExpiry');
+    if (isAdmin === 'true' && expiry && Date.now() < parseInt(expiry, 10)) {
+      router.push('/admin');
     }
-  });
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,7 +38,8 @@ export default function LoginPage() {
       localStorage.setItem("isAdmin", "true");
       localStorage.setItem("userName", data.nome);
       localStorage.setItem("userRole", data.tipo);
-      localStorage.setItem("loginTime", Date.now().toString());
+      // Expira em 1 dia (24 horas)
+      localStorage.setItem("loginExpiry", (Date.now() + 24 * 60 * 60 * 1000).toString());
       router.push("/admin");
     } else {
       alert("Usuário ou senha incorretos!");

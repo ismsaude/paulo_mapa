@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Check, Edit2, X, UserCheck, Mail, Ban, Map as MapIcon } from 'lucide-react';
+import { Check, Edit2, X, UserCheck, Mail, Ban, Map as MapIcon, Settings, LogOut } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, rectSortingStrategy } from '@dnd-kit/sortable';
 import DraggableEndereco from '@/components/DraggableEndereco';
@@ -24,6 +24,7 @@ export default function QuadraPage() {
 
   // Estados Admin e Edição
   const [isAdminUser, setIsAdminUser] = useState(false);
+  const [isLogged, setIsLogged] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [editNumero, setEditNumero] = useState("");
   const [editingRuaStr, setEditingRuaStr] = useState<string | null>(null);
@@ -35,13 +36,31 @@ export default function QuadraPage() {
   );
 
   useEffect(() => {
-    const adminMode = localStorage.getItem('isAdmin') === 'true';
+    const isAdmin = localStorage.getItem('isAdmin');
     const role = localStorage.getItem('userRole');
-    if (adminMode && role === 'admin') {
-      setIsAdminUser(true);
+    const expiry = localStorage.getItem('loginExpiry');
+    
+    if (isAdmin === 'true' && expiry && Date.now() > parseInt(expiry, 10)) {
+      localStorage.removeItem('isAdmin');
+      localStorage.removeItem('userRole');
+      localStorage.removeItem('loginExpiry');
+      setIsLogged(false);
+      setIsAdminUser(false);
+    } else if (isAdmin === 'true') {
+      setIsLogged(true);
+      if (role === 'admin') setIsAdminUser(true);
     }
+    
     fetchQuadraEEnderecos();
   }, [params?.id]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('isAdmin');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('loginExpiry');
+    setIsLogged(false);
+    setIsAdminUser(false);
+  };
 
   async function fetchQuadraEEnderecos() {
     if (!params?.id) return;
@@ -257,7 +276,24 @@ export default function QuadraPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 sm:p-4">
+    <main className="min-h-screen bg-gray-50 sm:p-4 relative">
+      <div className="absolute top-6 right-6 hidden sm:flex items-center gap-2 z-20">
+        {isLogged ? (
+          <>
+             <Link href="/admin" className="text-[#0A4D3C] bg-[#0A4D3C]/10 hover:bg-[#0A4D3C]/20 px-3 py-1.5 rounded-full text-sm font-bold transition-all" title="Painel de Administração">
+                Admin
+             </Link>
+             <button onClick={handleLogout} className="text-red-500 bg-red-50 hover:bg-red-100 p-2 rounded-full transition-all" title="Sair">
+                <LogOut size={16} />
+             </button>
+          </>
+        ) : (
+          <Link href="/login" className="text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors" title="Acesso Admin">
+            <Settings size={20} />
+          </Link>
+        )}
+      </div>
+
       <div className="bg-white min-h-screen sm:min-h-[calc(100vh-2rem)] max-w-4xl mx-auto rounded-t-3xl sm:rounded-3xl p-6 shadow-sm relative">
         
         {/* CABEÇALHO PADRONIZADO */}

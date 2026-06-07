@@ -10,32 +10,38 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [isAdminUser, setIsAdminUser] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLogged, setIsLogged] = useState(false);
   
   // States para edição inline
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
 
   useEffect(() => {
-    // Checa se o usuário atual é admin logado
-    const adminMode = localStorage.getItem('isAdmin') === 'true';
+    const isAdmin = localStorage.getItem('isAdmin');
     const role = localStorage.getItem('userRole');
-    if (adminMode) {
-      setIsLoggedIn(true);
-      if (role === 'admin') {
-        setIsAdminUser(true);
-      }
+    const expiry = localStorage.getItem('loginExpiry');
+    
+    if (isAdmin === 'true' && expiry && Date.now() > parseInt(expiry, 10)) {
+      localStorage.removeItem('isAdmin');
+      localStorage.removeItem('userRole');
+      localStorage.removeItem('loginExpiry');
+      setIsLogged(false);
+      setIsAdminUser(false);
+      return;
+    }
+    
+    if (isAdmin === 'true') {
+      setIsLogged(true);
+      if (role === 'admin') setIsAdminUser(true);
     }
   }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('isAdmin');
-    localStorage.removeItem('userName');
     localStorage.removeItem('userRole');
-    localStorage.removeItem('loginTime');
-    setIsLoggedIn(false);
+    localStorage.removeItem('loginExpiry');
+    setIsLogged(false);
     setIsAdminUser(false);
-    window.location.reload();
   };
 
   useEffect(() => {
@@ -141,19 +147,21 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gray-50 p-4 pb-12 relative">
-      <div className="absolute top-6 right-6 z-10 flex items-center gap-3">
-        {isLoggedIn && (
-          <button 
-            onClick={handleLogout}
-            className="text-red-400 hover:text-red-600 transition-colors bg-red-50 p-2 rounded-full" 
-            title="Sair do sistema"
-          >
-            <LogOut size={20} />
-          </button>
+      <div className="absolute top-6 right-6 flex items-center gap-2 z-20">
+        {isLogged ? (
+          <>
+             <Link href="/admin" className="text-[#0A4D3C] bg-[#0A4D3C]/10 hover:bg-[#0A4D3C]/20 px-3 py-1.5 rounded-full text-sm font-bold transition-all" title="Painel de Administração">
+                Admin
+             </Link>
+             <button onClick={handleLogout} className="text-red-500 bg-red-50 hover:bg-red-100 p-2 rounded-full transition-all" title="Sair">
+                <LogOut size={16} />
+             </button>
+          </>
+        ) : (
+          <Link href="/login" className="text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors" title="Acesso Admin">
+            <Settings size={20} />
+          </Link>
         )}
-        <Link href="/login" className="text-[#0A4D3C] hover:text-[#083d2f] transition-colors bg-[#0A4D3C]/10 hover:bg-[#0A4D3C]/20 p-2 rounded-full" title="Configurações">
-          <Settings size={20} />
-        </Link>
       </div>
       
       <button 

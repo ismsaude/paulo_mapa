@@ -33,7 +33,12 @@ export default function AdminPage() {
 
     const isAdmin = localStorage.getItem('isAdmin');
     const role = localStorage.getItem('userRole') || 'assistente';
-    if (!isAdmin) {
+    const expiry = localStorage.getItem('loginExpiry');
+    
+    if (!isAdmin || (expiry && Date.now() > parseInt(expiry, 10))) {
+      localStorage.removeItem('isAdmin');
+      localStorage.removeItem('userRole');
+      localStorage.removeItem('loginExpiry');
       router.push('/login');
       return;
     }
