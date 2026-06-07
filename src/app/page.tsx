@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { ArrowRight, X, Settings, Map as MapIcon, Edit2, Check } from 'lucide-react';
+import { ArrowRight, X, Settings, Map as MapIcon, Edit2, Check, LogOut } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import MapModal from '@/components/MapModal';
@@ -10,6 +10,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [isAdminUser, setIsAdminUser] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   
   // States para edição inline
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -19,10 +20,23 @@ export default function Home() {
     // Checa se o usuário atual é admin logado
     const adminMode = localStorage.getItem('isAdmin') === 'true';
     const role = localStorage.getItem('userRole');
-    if (adminMode && role === 'admin') {
-      setIsAdminUser(true);
+    if (adminMode) {
+      setIsLoggedIn(true);
+      if (role === 'admin') {
+        setIsAdminUser(true);
+      }
     }
   }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('isAdmin');
+    localStorage.removeItem('userName');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('loginTime');
+    setIsLoggedIn(false);
+    setIsAdminUser(false);
+    window.location.reload();
+  };
 
   useEffect(() => {
     async function fetchTerritorios() {
@@ -127,9 +141,20 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gray-50 p-4 pb-12 relative">
-      <Link href="/login" className="absolute top-6 right-6 text-gray-300 hover:text-gray-500 transition-colors z-10" title="Acesso Admin">
-        <Settings size={20} />
-      </Link>
+      <div className="absolute top-6 right-6 z-10 flex items-center gap-3">
+        {isLoggedIn && (
+          <button 
+            onClick={handleLogout}
+            className="text-red-400 hover:text-red-600 transition-colors bg-red-50 p-2 rounded-full" 
+            title="Sair do sistema"
+          >
+            <LogOut size={20} />
+          </button>
+        )}
+        <Link href="/login" className="text-[#0A4D3C] hover:text-[#083d2f] transition-colors bg-[#0A4D3C]/10 hover:bg-[#0A4D3C]/20 p-2 rounded-full" title="Configurações">
+          <Settings size={20} />
+        </Link>
+      </div>
       
       <button 
         onClick={() => setIsMapOpen(true)}

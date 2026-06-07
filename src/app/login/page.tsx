@@ -12,6 +12,29 @@ export default function LoginPage() {
   const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Verifica se já está logado e se a sessão é válida
+  useState(() => {
+    if (typeof window !== 'undefined') {
+      const admin = localStorage.getItem('isAdmin');
+      const loginTime = localStorage.getItem('loginTime');
+      if (admin === 'true' && loginTime) {
+        const tempoPassado = Date.now() - parseInt(loginTime, 10);
+        const umDiaEmMs = 24 * 60 * 60 * 1000;
+        
+        if (tempoPassado < umDiaEmMs) {
+          // Sessão válida, redireciona
+          router.push('/admin');
+        } else {
+          // Sessão expirou
+          localStorage.removeItem('isAdmin');
+          localStorage.removeItem('userName');
+          localStorage.removeItem('userRole');
+          localStorage.removeItem('loginTime');
+        }
+      }
+    }
+  });
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!usuario || !senha) return;
@@ -30,6 +53,7 @@ export default function LoginPage() {
       localStorage.setItem("isAdmin", "true");
       localStorage.setItem("userName", data.nome);
       localStorage.setItem("userRole", data.tipo);
+      localStorage.setItem("loginTime", Date.now().toString());
       router.push("/admin");
     } else {
       alert("Usuário ou senha incorretos!");
