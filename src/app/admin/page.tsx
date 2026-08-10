@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { Home, Users, Mail, Ban, RefreshCw, Plus, Unlock, LogOut, Map, UserCog, ClockAlert, ChevronRight, ArrowLeft, X, BarChart2, ChevronDown } from 'lucide-react';
+import { Home, Users, Mail, Ban, RefreshCw, Plus, Unlock, LogOut, Map, UserCog, ClockAlert, ChevronRight, ArrowLeft, X, BarChart2, ChevronDown, Archive } from 'lucide-react';
 import Link from 'next/link';
 import DesignacaoMap from './DesignacaoMap';
 import GerenciarUsuarios from './GerenciarUsuarios';
+import RelatorioCiclos from './RelatorioCiclos';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -24,7 +25,7 @@ export default function AdminPage() {
   const [oldestQuadras, setOldestQuadras] = useState<any[]>([]);
   const [progressoData, setProgressoData] = useState<any[]>([]);
   const [expandedTerritorio, setExpandedTerritorio] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'alertas' | 'bloqueadas' | 'usuarios' | 'designacao' | 'progresso'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'alertas' | 'bloqueadas' | 'usuarios' | 'designacao' | 'progresso' | 'relatorios'>('dashboard');
   const [userRole, setUserRole] = useState('assistente');
   const fetchBeganRef = useRef(false);
 
@@ -204,8 +205,69 @@ export default function AdminPage() {
     setLoading(false);
   }
 
+  // Guarda a situação de todas as casas antes de zerar tudo.
+  // É isto que alimenta o relatório "casas que ninguém consegue falar".
+  const salvarFotoDoCiclo = async () => {
+    const linhas = todosEnderecos.map(end => {
+      const s = String(end.status).toLowerCase();
+      const isBloq = s === 'bloqueado' || end.is_bloqueado === true || String(end.is_bloqueado).toLowerCase() === 'true';
+      const foiFalado = !isBloq && (s === 'falado' || s === 'true' || s === 'cartas');
+
+      return {
+        endereco_id: end.id,
+        territorio_nome: end.quadra?.territorio?.nome ?? null,
+        quadra_nome: end.quadra?.nome ?? null,
+        rua: end.rua,
+        numero: end.numero,
+        status: end.status,
+        falado: foiFalado,
+        data_visita: end.data_visita || null,
+      };
+    });
+
+    const bloqueados = linhas.filter(l => {
+      const s = String(l.status).toLowerCase();
+      return s === 'bloqueado';
+    }).length;
+    const falados = linhas.filter(l => ['falado', 'true'].includes(String(l.status).toLowerCase())).length;
+    const cartas = linhas.filter(l => String(l.status).toLowerCase() === 'cartas').length;
+
+    const { data: ciclo, error: cicloErr } = await supabase
+      .from('ciclos')
+      .insert([{
+        data_reset: new Date().toISOString(),
+        total_casas: linhas.length,
+        total_falados: falados,
+        total_cartas: cartas,
+        total_bloqueados: bloqueados,
+        total_nao_falados: linhas.length - falados - cartas - bloqueados,
+      }])
+      .select('id')
+      .single();
+
+    if (cicloErr || !ciclo) {
+      return { ok: false, msg: cicloErr?.message ?? 'não foi possível criar o ciclo' };
+    }
+
+    // O Supabase não aceita 2600 linhas de uma vez; vai em blocos.
+    const bloco = 500;
+    for (let i = 0; i < linhas.length; i += bloco) {
+      const { error } = await supabase
+        .from('historico_casas')
+        .insert(linhas.slice(i, i + bloco).map(l => ({ ...l, ciclo_id: ciclo.id })));
+
+      if (error) {
+        // Desfaz o ciclo pela metade para não deixar relatório furado.
+        await supabase.from('ciclos').delete().eq('id', ciclo.id);
+        return { ok: false, msg: error.message };
+      }
+    }
+
+    return { ok: true, total: linhas.length };
+  };
+
   const handleReset = async () => {
-    const confirm = window.confirm("ATENÇÃO: Você vai limpar o status de toda a congregação voltando as quadras para 0%. As casas restritas (bloqueadas) NÃO serão afetadas. Deseja mesmo continuar?");
+    const confirm = window.confirm("ATENÇÃO: Você vai limpar o status de toda a congregação voltando as quadras para 0%. As casas restritas (bloqueadas) NÃO serão afetadas.\n\nAntes de limpar, o sistema vai salvar um relatório com a situação atual de todas as casas. Deseja continuar?");
     if (!confirm) return;
 
     const senhaDigitada = window.prompt("AÇÃO DESTRUTIVA!\nDigite a senha de acesso (admin) para confirmar a limpeza:");
@@ -215,20 +277,38 @@ export default function AdminPage() {
     }
 
     try {
-      // Atualiza somente os endereços que estão com status marcado que não seja bloqueado.
+      setLoading(true);
+      const foto = await salvarFotoDoCiclo();
+
+      if (!foto.ok) {
+        setLoading(false);
+        const faltaTabela = /relation .* does not exist|schema cache|Could not find the table/i.test(foto.msg ?? '');
+        alert(
+          faltaTabela
+            ? "O reset foi CANCELADO porque as tabelas de histórico ainda não existem.\n\nRode o arquivo sql/001_designacoes_e_historico.sql no SQL Editor do Supabase e tente de novo."
+            : `O reset foi CANCELADO porque o relatório não pôde ser salvo:\n\n${foto.msg}\n\nNada foi apagado.`
+        );
+        return;
+      }
+
+      // Só zera depois que a foto está garantida no banco.
       const { error: resetErr } = await supabase
         .from('enderecos')
         .update({ status: 'false', data_visita: null })
         .in('status', ['Falado', 'falado', 'Cartas', 'cartas', 'true', 'TRUE']);
 
+      setLoading(false);
+
       if (resetErr) {
-        alert("Erro ao resetar: " + resetErr.message);
+        alert("O relatório foi salvo, mas houve erro ao resetar: " + resetErr.message);
       } else {
-        alert("Todos os mapas foram resetados com sucesso! Casas com restrição foram preservadas.");
-        fetchData(); // Recarrega o painel em tempo real
+        alert(`Pronto! Relatório de ${foto.total} casas guardado e os mapas foram resetados.\n\nVeja em Relatórios > Casas que passam batido. Casas com restrição foram preservadas.`);
+        fetchData();
       }
     } catch (e) {
+      setLoading(false);
       console.error(e);
+      alert("Erro inesperado no reset. Nada foi apagado se o relatório não apareceu.");
     }
   };
 
@@ -348,7 +428,8 @@ export default function AdminPage() {
                {activeTab === 'dashboard' ? 'Painel Geral' :
                 activeTab === 'alertas' ? 'Inatividade' :
                 activeTab === 'bloqueadas' ? 'Não Visitar' : 
-                activeTab === 'designacao' ? 'Designações' : 
+                activeTab === 'designacao' ? 'Designações' :
+                activeTab === 'relatorios' ? 'Relatórios' :
                 activeTab === 'progresso' ? 'Visão Geral' : 'Gerenciar Usuários'}
              </h1>
           </div>
@@ -441,7 +522,16 @@ export default function AdminPage() {
                 <div className="bg-purple-50 text-purple-500 p-3 rounded-xl"><Map size={24} /></div>
                 <div className="flex-1">
                   <span className="block text-[17px] leading-tight">Designação de Território</span>
-                  <span className="text-xs text-gray-400 font-normal">Arraste bolas e faça download</span>
+                  <span className="text-xs text-gray-400 font-normal">Quem está com cada território</span>
+                </div>
+                <ChevronRight className="text-gray-300" />
+              </button>
+
+              <button onClick={() => setActiveTab('relatorios')} className="text-left bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-4 hover:border-teal-200 hover:bg-slate-50 transition-all font-bold text-slate-700 active:scale-[0.98]">
+                <div className="bg-teal-50 text-teal-600 p-3 rounded-xl"><Archive size={24} /></div>
+                <div className="flex-1">
+                  <span className="block text-[17px] leading-tight">Relatórios de Ciclos</span>
+                  <span className="text-xs text-gray-400 font-normal">Casas que ninguém consegue falar</span>
                 </div>
                 <ChevronRight className="text-gray-300" />
               </button>
@@ -642,6 +732,10 @@ export default function AdminPage() {
         {/* TELA DE DESIGNAÇÃO VIA MAP */}
         {activeTab === 'designacao' && (
           <DesignacaoMap />
+        )}
+
+        {activeTab === 'relatorios' && (
+          <RelatorioCiclos />
         )}
 
         {/* MODAL DE DETALHES DOS CARDS */}
