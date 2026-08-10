@@ -48,9 +48,9 @@ export default function DraggableEndereco({ end, onEnderecoClick, isBloqueado, t
       )}
 
       <button 
-        onClick={(e) => {
-           if (editId === end.id) return; 
-           handleEnderecoClick(end, e);
+        onClick={() => {
+           if (editId === end.id) return;
+           onEnderecoClick(end);
         }}
         className={`flex items-center gap-2.5 w-full p-3 ${isAdminUser ? 'ml-6' : ''}`}
       >
@@ -122,8 +122,4 @@ export default function DraggableEndereco({ end, onEnderecoClick, isBloqueado, t
       </button>
     </div>
   );
-}
-
-function handleEnderecoClick(end: any, e: any) {
-  // handled internally or passed by prop
 }

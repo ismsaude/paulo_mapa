@@ -549,8 +549,8 @@ export default function QuadraPage() {
                   <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 mb-2">
                     <Mail size={22} />
                   </div>
-                  <span className="text-[9px] font-bold text-center text-slate-700 leading-tight">
-                    Coloquei o convite<br/>do Congresso<br/>na caixa de correio
+                  <span className="text-[10px] font-bold text-center text-slate-700 leading-snug">
+                    Coloquei uma<br/>carta
                   </span>
                 </button>
 
