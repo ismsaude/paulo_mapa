@@ -169,8 +169,8 @@ select * from (values
   ('Terça',        'dia',   '#9D174D',  9),
   ('Quarta',       'dia',   '#065F46', 10),
   ('Quinta',       'dia',   '#1E40AF', 11),
-  ('Sexta manhã',  'dia',   '#B45309', 12),
-  ('Sexta tarde',  'dia',   '#7E22CE', 13),
+  ('Quinta noitinha','dia', '#7E22CE', 12),
+  ('Sexta manhã',  'dia',   '#B45309', 13),
   ('Sábado',       'dia',   '#0F766E', 14)
 ) as v(nome, tipo, cor, ordem)
 where not exists (select 1 from public.responsaveis);
