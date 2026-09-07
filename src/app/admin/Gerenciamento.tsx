@@ -31,7 +31,7 @@ const DIAS = ['segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado', 'domi
 // O verde da casa, o mesmo dos botões e das outras telas do painel.
 const VERDE = '#0A4D3C';
 
-const NOMES_DIA_SEMANA = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+export const NOMES_DIA_SEMANA = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
 
 const isoHoje = () => new Date().toISOString().split('T')[0];
 
@@ -74,6 +74,25 @@ const numeroDe = (nome: string) => {
   const m = String(nome ?? '').match(/\d+/);
   return m ? parseInt(m[0], 10) : 0;
 };
+
+// ------------------------------------------------- etiqueta do responsável
+// O dia embaixo do nome é o que diferencia dois responsáveis homônimos
+// (o mesmo irmão pode dirigir a saída de terça e a de sexta).
+export function EtiquetaResponsavel({ nome, cor, dia }: { nome: string; cor: string; dia: number | null }) {
+  return (
+    <>
+      <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: cor }} />
+      <span className="min-w-0 flex-1">
+        <span className="block text-xs font-bold text-slate-700 truncate leading-tight">{nome}</span>
+        {dia !== null && dia !== undefined && (
+          <span className="block text-[10px] text-gray-400 font-medium leading-tight mt-0.5 first-letter:uppercase">
+            {NOMES_DIA_SEMANA[dia]}
+          </span>
+        )}
+      </span>
+    </>
+  );
+}
 
 // ------------------------------------------------------------------- % anel
 // Anel fino com a porcentagem no meio. Serve de âncora visual do território.
@@ -675,8 +694,7 @@ export default function Gerenciamento({
                               doDia ? 'border-[#0A4D3C] bg-[#0A4D3C]/5' : 'border-gray-200 bg-white hover:border-slate-400'
                             }`}
                           >
-                            <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: r.cor }} />
-                            <span className="text-xs font-bold text-slate-700 truncate">{r.nome}</span>
+                            <EtiquetaResponsavel nome={r.nome} cor={r.cor} dia={r.dia_semana} />
                           </button>
                         );
                       })}
@@ -723,8 +741,7 @@ export default function Gerenciamento({
                   {ativos.map(r => (
                     <button key={r.id} onClick={() => registrar(quadrasDoTerrAberto, r, dataTerr)} disabled={salvando}
                       className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-gray-200 bg-white hover:border-slate-400 text-left transition active:scale-95 disabled:opacity-50">
-                      <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: r.cor }} />
-                      <span className="text-xs font-bold text-slate-700 truncate">{r.nome}</span>
+                      <EtiquetaResponsavel nome={r.nome} cor={r.cor} dia={r.dia_semana} />
                     </button>
                   ))}
                 </div>

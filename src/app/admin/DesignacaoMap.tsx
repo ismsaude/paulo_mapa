@@ -7,11 +7,11 @@ import {
   Download, History, X, Map as MapIcon, Move, Check, RotateCcw,
   CalendarDays, Trash2, Loader2, Save, AlertTriangle, LayoutGrid, Eraser
 } from 'lucide-react';
-import Gerenciamento from './Gerenciamento';
+import Gerenciamento, { EtiquetaResponsavel } from './Gerenciamento';
 
 type Territorio = { id: string; nome: string };
 type Quadra = { id: string; nome: string; territorio_id: string };
-type Responsavel = { id: string; nome: string; tipo: 'grupo' | 'dia'; cor: string; ordem: number; ativo: boolean };
+type Responsavel = { id: string; nome: string; tipo: 'grupo' | 'dia'; cor: string; ordem: number; ativo: boolean; dia_semana: number | null };
 type Designacao = {
   id: string;
   territorio_id: string;
@@ -83,7 +83,8 @@ export default function DesignacaoMap() {
     const terrs = (rTerr.data ?? []) as Territorio[];
     setTerritorios(terrs);
     setQuadras((rQuad.data ?? []) as Quadra[]);
-    setResponsaveis((rResp.data ?? []) as Responsavel[]);
+    setResponsaveis(((rResp.data ?? []) as Responsavel[])
+      .map(r => ({ ...r, dia_semana: r.dia_semana ?? null })));
 
     const todas = (rDesig.data ?? []) as Designacao[];
     setAbertas(todas.filter(d => !d.data_devolucao));
@@ -824,8 +825,7 @@ export default function DesignacaoMap() {
                           {grupos.map(r => (
                             <button key={r.id} onClick={() => designar(r)} disabled={salvando}
                               className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-gray-200 bg-white hover:border-slate-400 text-left transition active:scale-95 disabled:opacity-50">
-                              <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: r.cor }} />
-                              <span className="text-xs font-bold text-slate-700 truncate">{r.nome}</span>
+                              <EtiquetaResponsavel nome={r.nome} cor={r.cor} dia={r.dia_semana} />
                             </button>
                           ))}
                         </div>
@@ -839,8 +839,7 @@ export default function DesignacaoMap() {
                           {dias.map(r => (
                             <button key={r.id} onClick={() => designar(r)} disabled={salvando}
                               className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-gray-200 bg-white hover:border-slate-400 text-left transition active:scale-95 disabled:opacity-50">
-                              <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: r.cor }} />
-                              <span className="text-xs font-bold text-slate-700 truncate">{r.nome}</span>
+                              <EtiquetaResponsavel nome={r.nome} cor={r.cor} dia={r.dia_semana} />
                             </button>
                           ))}
                         </div>
