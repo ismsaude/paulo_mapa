@@ -5,10 +5,12 @@ import { supabase } from '@/lib/supabase';
 import { regiaoPadrao, numeroDoTerritorio, type RegiaoMapa } from '@/lib/mapaTerritorios';
 import {
   Download, History, X, Map as MapIcon, Move, Check, RotateCcw,
-  CalendarDays, Trash2, Loader2, Save, AlertTriangle
+  CalendarDays, Trash2, Loader2, Save, AlertTriangle, LayoutGrid
 } from 'lucide-react';
+import Gerenciamento from './Gerenciamento';
 
 type Territorio = { id: string; nome: string };
+type Quadra = { id: string; nome: string; territorio_id: string };
 type Responsavel = { id: string; nome: string; tipo: 'grupo' | 'dia'; cor: string; ordem: number; ativo: boolean };
 type Designacao = {
   id: string;
@@ -36,12 +38,13 @@ const diasDesde = (d: string) => {
 };
 
 export default function DesignacaoMap() {
-  const [aba, setAba] = useState<'mapa' | 'historico' | 'calibrar'>('mapa');
+  const [aba, setAba] = useState<'mapa' | 'gerenciamento' | 'historico' | 'calibrar'>('mapa');
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
 
   const [territorios, setTerritorios] = useState<Territorio[]>([]);
+  const [quadras, setQuadras] = useState<Quadra[]>([]);
   const [responsaveis, setResponsaveis] = useState<Responsavel[]>([]);
   const [abertas, setAbertas] = useState<Designacao[]>([]);
   const [historico, setHistorico] = useState<Designacao[]>([]);
@@ -59,8 +62,9 @@ export default function DesignacaoMap() {
     setCarregando(true);
     setErro(null);
 
-    const [rTerr, rResp, rDesig, rMapa] = await Promise.all([
+    const [rTerr, rQuad, rResp, rDesig, rMapa] = await Promise.all([
       supabase.from('territorios').select('id, nome').order('nome'),
+      supabase.from('quadras').select('id, nome, territorio_id'),
       supabase.from('responsaveis').select('*').eq('ativo', true).order('ordem'),
       supabase.from('designacoes').select('*').order('data_designacao', { ascending: false }),
       supabase.from('territorio_mapa').select('*'),
@@ -75,6 +79,7 @@ export default function DesignacaoMap() {
 
     const terrs = (rTerr.data ?? []) as Territorio[];
     setTerritorios(terrs);
+    setQuadras((rQuad.data ?? []) as Quadra[]);
     setResponsaveis((rResp.data ?? []) as Responsavel[]);
 
     const todas = (rDesig.data ?? []) as Designacao[];
@@ -106,7 +111,7 @@ export default function DesignacaoMap() {
     if (!territorioAberto) return;
     setSalvando(true);
 
-    const { error } = await supabase.from('designacoes').insert([{
+    const { data: criada, error } = await supabase.from('designacoes').insert([{
       territorio_id: territorioAberto.id,
       responsavel_id: resp.id,
       territorio_nome: territorioAberto.nome,
@@ -114,11 +119,10 @@ export default function DesignacaoMap() {
       responsavel_cor: resp.cor,
       data_designacao: formData,
       observacao: formObs || null,
-    }]);
-
-    setSalvando(false);
+    }]).select('id').single();
 
     if (error) {
+      setSalvando(false);
       // O índice único do banco barra dois responsáveis no mesmo território.
       if (error.code === '23505') {
         alert('Este território já está designado para alguém. Devolva primeiro para designar de novo.');
@@ -128,6 +132,38 @@ export default function DesignacaoMap() {
       return;
     }
 
+    // É isto que faz a aba Gerenciamento se atualizar sozinha: designar o
+    // território registra o trabalho de cada quadra dele naquele dia.
+    // Se a quadra e o dia já tiverem esse responsável, o banco ignora em vez
+    // de duplicar a linha.
+    const suasQuadras = quadras.filter(q => q.territorio_id === territorioAberto.id);
+    if (suasQuadras.length > 0) {
+      const { error: erroTrab } = await supabase.from('trabalhos').upsert(
+        suasQuadras.map(q => ({
+          territorio_id: territorioAberto.id,
+          quadra_id: q.id,
+          responsavel_id: resp.id,
+          designacao_id: criada?.id ?? null,
+          territorio_nome: territorioAberto.nome,
+          quadra_nome: q.nome,
+          responsavel_nome: resp.nome,
+          responsavel_cor: resp.cor,
+          data: formData,
+          observacao: formObs || null,
+        })),
+        { onConflict: 'quadra_id,responsavel_id,data', ignoreDuplicates: true },
+      );
+
+      if (erroTrab) {
+        alert(
+          'A designação foi salva, mas não entrou na grade do Gerenciamento:\n\n'
+          + erroTrab.message
+          + '\n\nSe a tabela ainda não existe, rode o arquivo sql/002_gerenciamento.sql no Supabase.'
+        );
+      }
+    }
+
+    setSalvando(false);
     setTerritorioAberto(null);
     setFormObs('');
     carregar();
@@ -342,23 +378,27 @@ export default function DesignacaoMap() {
     <div className="flex flex-col gap-4">
 
       {/* ABAS INTERNAS */}
-      <div className="bg-white rounded-2xl p-1.5 shadow-sm border border-gray-100 flex gap-1">
+      <div className="bg-white rounded-2xl p-1.5 shadow-sm border border-gray-100 grid grid-cols-2 gap-1 sm:flex">
         {([
           ['mapa', 'Mapa', MapIcon],
+          ['gerenciamento', 'Gerenciamento', LayoutGrid],
           ['historico', 'Histórico', History],
           ['calibrar', 'Calibrar', Move],
         ] as const).map(([id, rotulo, Icone]) => (
           <button
             key={id}
             onClick={() => setAba(id)}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all active:scale-95 ${
+            className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2.5 px-1 rounded-xl text-[11px] sm:text-sm font-bold transition-all active:scale-95 ${
               aba === id ? 'bg-[#0A4D3C] text-white shadow-sm' : 'text-slate-500 hover:bg-gray-50'
             }`}
           >
-            <Icone size={16} /> {rotulo}
+            <Icone size={16} className="shrink-0" /> <span className="truncate">{rotulo}</span>
           </button>
         ))}
       </div>
+
+      {/* ------------------------------------------------------ GERENCIAMENTO */}
+      {aba === 'gerenciamento' && <Gerenciamento onResponsaveisMudaram={carregar} />}
 
       {/* ---------------------------------------------------------- HISTÓRICO */}
       {aba === 'historico' && (
@@ -424,7 +464,7 @@ export default function DesignacaoMap() {
       )}
 
       {/* --------------------------------------------------------- MAPA/CALIBRAR */}
-      {aba !== 'historico' && (
+      {(aba === 'mapa' || aba === 'calibrar') && (
         <div className="bg-white rounded-3xl p-4 sm:p-6 shadow-sm border border-gray-100 flex flex-col items-center">
 
           {aba === 'calibrar' ? (
