@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { regiaoPadrao, numeroDoTerritorio, type RegiaoMapa } from '@/lib/mapaTerritorios';
 import {
   Download, History, X, Map as MapIcon, Move, Check, RotateCcw,
-  CalendarDays, Trash2, Loader2, Save, AlertTriangle, LayoutGrid
+  CalendarDays, Trash2, Loader2, Save, AlertTriangle, LayoutGrid, Eraser
 } from 'lucide-react';
 import Gerenciamento from './Gerenciamento';
 
@@ -49,6 +49,9 @@ export default function DesignacaoMap() {
   const [abertas, setAbertas] = useState<Designacao[]>([]);
   const [historico, setHistorico] = useState<Designacao[]>([]);
   const [regioes, setRegioes] = useState<Record<string, RegiaoMapa>>({});
+
+  const [limpezaAberta, setLimpezaAberta] = useState(false);
+  const [confirmacaoApagar, setConfirmacaoApagar] = useState('');
 
   const [territorioAberto, setTerritorioAberto] = useState<Territorio | null>(null);
   const [formData, setFormData] = useState(hoje());
@@ -182,6 +185,40 @@ export default function DesignacaoMap() {
     if (error) { alert('Erro ao devolver: ' + error.message); return; }
 
     setTerritorioAberto(null);
+    carregar();
+  };
+
+  // ------------------------------------------------------------ limpar tudo
+  // Devolver é o caminho normal: o mapa fica limpo e o período de cada
+  // território entra para o histórico, igual a devolver um por um.
+  const devolverTodas = async () => {
+    setSalvando(true);
+    const { error } = await supabase
+      .from('designacoes')
+      .update({ data_devolucao: hoje() })
+      .is('data_devolucao', null);
+
+    setSalvando(false);
+    if (error) { alert('Erro ao devolver: ' + error.message); return; }
+
+    setLimpezaAberta(false);
+    carregar();
+  };
+
+  // Apagar é para quando a designação foi lançada errada e não deve deixar
+  // rastro. Leva junto os registros que ela criou na grade do Gerenciamento.
+  const apagarTodasAbertas = async () => {
+    setSalvando(true);
+    const { error } = await supabase
+      .from('designacoes')
+      .delete()
+      .in('id', abertas.map(d => d.id));
+
+    setSalvando(false);
+    if (error) { alert('Erro ao apagar: ' + error.message); return; }
+
+    setLimpezaAberta(false);
+    setConfirmacaoApagar('');
     carregar();
   };
 
@@ -490,10 +527,18 @@ export default function DesignacaoMap() {
               <p className="text-xs text-gray-500 font-medium">
                 Toque num território do mapa para designar ou devolver.
               </p>
-              <button onClick={baixarImagem}
-                className="bg-[#0A4D3C] hover:bg-[#07382c] text-white flex items-center gap-2 py-2 px-4 rounded-xl text-xs font-bold shadow-sm transition active:scale-95">
-                <Download size={15} /> Baixar imagem
-              </button>
+              <div className="flex items-center gap-2">
+                {abertas.length > 0 && (
+                  <button onClick={() => { setLimpezaAberta(true); setConfirmacaoApagar(''); }}
+                    className="bg-white border border-gray-200 text-slate-600 flex items-center gap-2 py-2 px-3 rounded-xl text-xs font-bold hover:border-slate-400 hover:text-slate-800 transition active:scale-95">
+                    <Eraser size={15} /> Limpar <span className="text-gray-400 font-black tabular-nums">{abertas.length}</span>
+                  </button>
+                )}
+                <button onClick={baixarImagem}
+                  className="bg-[#0A4D3C] hover:bg-[#07382c] text-white flex items-center gap-2 py-2 px-4 rounded-xl text-xs font-bold shadow-sm transition active:scale-95">
+                  <Download size={15} /> Baixar imagem
+                </button>
+              </div>
             </div>
           )}
 
@@ -632,6 +677,77 @@ export default function DesignacaoMap() {
         </div>
       )}
 
+      {/* ------------------------------------------------- MODAL DE LIMPEZA */}
+      {limpezaAberta && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+             onClick={() => setLimpezaAberta(false)}>
+          <div className="bg-white rounded-3xl w-full max-w-md max-h-[88vh] overflow-y-auto shadow-2xl"
+               onClick={e => e.stopPropagation()}>
+
+            <div className="flex justify-between items-start p-5 border-b border-gray-100">
+              <div>
+                <h3 className="font-bold text-lg text-slate-800">Limpar o mapa</h3>
+                <p className="text-xs text-gray-500">
+                  {abertas.length} {abertas.length === 1 ? 'território está' : 'territórios estão'} em campo agora.
+                </p>
+              </div>
+              <button onClick={() => setLimpezaAberta(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 shrink-0">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-5 flex flex-col gap-4">
+
+              {/* Caminho normal, sem perda de dado. */}
+              <div className="border border-gray-200 rounded-2xl p-4">
+                <h4 className="text-sm font-bold text-slate-800 mb-1">Registrar a devolução de todos</h4>
+                <p className="text-xs text-slate-500 leading-relaxed mb-3">
+                  Marca a devolução de hoje em todos. O mapa fica limpo e cada período
+                  continua no Histórico e na grade do Gerenciamento. É o mesmo que devolver
+                  um por um, só que de uma vez.
+                </p>
+                <button onClick={devolverTodas} disabled={salvando}
+                  className="w-full bg-[#0A4D3C] hover:bg-[#07382c] text-white py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition disabled:opacity-50">
+                  {salvando ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+                  Devolver {abertas.length}
+                </button>
+              </div>
+
+              {/* Caminho destrutivo, escondido atrás de uma palavra digitada. */}
+              <div className="border border-red-200 bg-red-50/40 rounded-2xl p-4">
+                <h4 className="text-sm font-bold text-red-700 mb-1 flex items-center gap-1.5">
+                  <AlertTriangle size={14} /> Apagar sem deixar rastro
+                </h4>
+                <p className="text-xs text-slate-600 leading-relaxed mb-1">
+                  Para quando a designação foi lançada errada. Some do Histórico como se
+                  nunca tivesse existido, e leva junto os registros que ela criou na grade
+                  do Gerenciamento.
+                </p>
+                <p className="text-[11px] text-red-700 font-bold mb-3">Não dá para desfazer.</p>
+
+                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 block">
+                  Digite APAGAR para liberar
+                </label>
+                <input
+                  type="text" value={confirmacaoApagar}
+                  onChange={e => setConfirmacaoApagar(e.target.value)}
+                  placeholder="APAGAR"
+                  className="w-full bg-white border border-red-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 outline-none focus:border-red-500 transition placeholder:text-gray-300 placeholder:font-medium mb-2.5"
+                />
+                <button
+                  onClick={apagarTodasAbertas}
+                  disabled={salvando || confirmacaoApagar.trim().toUpperCase() !== 'APAGAR'}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {salvando ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                  Apagar {abertas.length}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* ------------------------------------------------------------- MODAL */}
       {territorioAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
